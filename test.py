@@ -1,6 +1,8 @@
 import numpy as np
 import os
 import pyqtgraph as pqg
+import time
+# from smoothn import smoothn
 import sys
 from PyQt5 import QtCore, QtWidgets
 
@@ -19,8 +21,16 @@ class CrossHair(QtWidgets.QGraphicsItem):
         return QtCore.QRectF(-10, -10, 20, 20)
 
 
+class ExtendedCrossHair(QtCore.QObject):
+    def __init__(self):
+        super(QtCore.QObject, self).__init__()
+        self.vline = pqg.InfiniteLine(angle=90, movable=False)
+        self.hline = pqg.InfiniteLine(angle=0, movable=False)
+
+
 class TestWindow(QtWidgets.QWidget):
     def __init__(self, parent=None):
+        ts = time.time()
         super(TestWindow, self).__init__(parent)
         self.layout = QtWidgets.QHBoxLayout()
         # ImageView is too bulky
@@ -38,6 +48,8 @@ class TestWindow(QtWidgets.QWidget):
         self.initData()
         self.loadData()
         self.createPlot()
+        self.setupEventHooks()
+        print(time.time() - ts)
 
     def initData(self):
         with open("datapath.txt", 'r') as f:
@@ -54,6 +66,8 @@ class TestWindow(QtWidgets.QWidget):
                 data.append(np.fromstring(f.read()[hdln:], '<u2').reshape(shape))
         # main 3d numpy array
         self.dat3d = np.dstack(data)
+        self.dat3ds = np.apply_along_axis(smooth, 2, self.dat3d)
+        # self.dat3dsn = smoothn(self.dat3d, axis=2)
         # generate energy data for plotting
         self.elist = [-9.9]
         while len(self.elist) < self.dat3d.shape[2]:
@@ -69,12 +83,18 @@ class TestWindow(QtWidgets.QWidget):
         self.implotwidget.hideAxis('left')
         self.implotwidget.hideAxis('bottom')
 
-        self.ch = CrossHair()
-        self.implotwidget.addItem(self.ch)
+        # self.ch = CrossHair()
+        self.ch = ExtendedCrossHair()
+        self.implotwidget.addItem(self.ch.hline, ignoreBounds=True)
+        self.implotwidget.addItem(self.ch.vline, ignoreBounds=True)
+
+    def setupEventHooks(self):
         # handle mouse clicks
         self.img.scene().sigMouseClicked.connect(self.handleClick)
-
-        self.img.scene().sigMouseMoved.connect(self.handleMove)
+        # handle mouse movement
+        # Use signalproxy for ratelimiting
+        sig = self.img.scene().sigMouseMoved
+        self.mvProxy = pqg.SignalProxy(signal=sig, rateLimit=60, slot=self.handleMove)
 
     def handleClick(self, event):
         """ sigMouseClicked emits a QEvent (or subclass thereof)"""
@@ -99,6 +119,12 @@ class TestWindow(QtWidgets.QWidget):
     def handleMove(self, pos):
         """ sigMouseMoved emits the position of the mouse"""
 
+        # SignalProxy wraps position of mouse into tuple
+        try:
+            pos = pos[0]
+        except IndexError:
+            return
+
         mappedPos = self.img.mapFromScene(pos)
         xmp = int(mappedPos.x())
         ymp = int(mappedPos.y())
@@ -110,11 +136,13 @@ class TestWindow(QtWidgets.QWidget):
             return  # discard  movement events originating outside the image
 
         # update crosshair
-        self.ch.setPos(xmp, ymp)
+        # self.ch.setPos(xmp, ymp)
+        self.ch.vline.setPos(xmp)
+        self.ch.hline.setPos(ymp)
 
         # update IV plot
         xdata = self.elist
-        ydata = smooth(self.dat3d[ymp, xmp, :])
+        ydata = self.dat3ds[ymp, xmp, :]
         pdi = pqg.PlotDataItem(xdata, ydata, pen='r')
         self.IVpltw.getPlotItem().clear()
         self.IVpltw.getPlotItem().addItem(pdi, clear=True)
