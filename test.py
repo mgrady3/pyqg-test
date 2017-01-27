@@ -1,24 +1,9 @@
 import numpy as np
 import os
 import pyqtgraph as pqg
-import time
 # from smoothn import smoothn
 import sys
 from PyQt5 import QtCore, QtWidgets
-
-
-class CrossHair(QtWidgets.QGraphicsItem):
-    def __init__(self):
-        super(QtWidgets.QGraphicsItem, self).__init__()
-        self.setFlag(self.ItemIgnoresTransformations)
-
-    def paint(self, p, *args):
-        p.setPen(pqg.mkPen('y'))
-        p.drawLine(-10, 0, 10, 0)
-        p.drawLine(0, -10, 0, 10)
-
-    def boundingRect(self):
-        return QtCore.QRectF(-10, -10, 20, 20)
 
 
 class ExtendedCrossHair(QtCore.QObject):
@@ -26,11 +11,11 @@ class ExtendedCrossHair(QtCore.QObject):
         super(QtCore.QObject, self).__init__()
         self.vline = pqg.InfiniteLine(angle=90, movable=False)
         self.hline = pqg.InfiniteLine(angle=0, movable=False)
+        self.curPos = (0, 0)
 
 
 class TestWindow(QtWidgets.QWidget):
     def __init__(self, parent=None):
-        ts = time.time()
         super(TestWindow, self).__init__(parent)
         self.layout = QtWidgets.QHBoxLayout()
         # ImageView is too bulky
@@ -49,7 +34,7 @@ class TestWindow(QtWidgets.QWidget):
         self.loadData()
         self.createPlot()
         self.setupEventHooks()
-        print(time.time() - ts)
+        # print(time.time() - ts)
 
     def initData(self):
         with open("datapath.txt", 'r') as f:
@@ -66,7 +51,7 @@ class TestWindow(QtWidgets.QWidget):
                 data.append(np.fromstring(f.read()[hdln:], '<u2').reshape(shape))
         # main 3d numpy array
         self.dat3d = np.dstack(data)
-        self.dat3ds = np.apply_along_axis(smooth, 2, self.dat3d)
+        # self.dat3ds = np.apply_along_axis(smooth, 2, self.dat3d)
         # self.dat3dsn = smoothn(self.dat3d, axis=2)
         # generate energy data for plotting
         self.elist = [-9.9]
@@ -75,10 +60,17 @@ class TestWindow(QtWidgets.QWidget):
 
         # self.imageplot.setImage(self.dat3d[:, :, middle].T)
 
+    def showImage(self, idx):
+
+        if idx not in range(self.dat3d.shape[2] - 1):
+            return
+        self.img.setImage(self.dat3d[:, :, idx].T)
+
     def createPlot(self):
 
         middle = int(self.dat3d.shape[2] / 2)
         self.img = pqg.ImageItem(self.dat3d[:, :, middle].T)
+        self.currentIndex = middle
         self.implotwidget.addItem(self.img)
         self.implotwidget.hideAxis('left')
         self.implotwidget.hideAxis('bottom')
@@ -89,6 +81,10 @@ class TestWindow(QtWidgets.QWidget):
         self.implotwidget.addItem(self.ch.vline, ignoreBounds=True)
 
     def setupEventHooks(self):
+        """
+        setup hooks for mouse clicks and mouse movement
+        key press events get tracked directly via overlaoding KeyPressEvent()
+        """
         # handle mouse clicks
         self.img.scene().sigMouseClicked.connect(self.handleClick)
         # handle mouse movement
@@ -97,7 +93,10 @@ class TestWindow(QtWidgets.QWidget):
         self.mvProxy = pqg.SignalProxy(signal=sig, rateLimit=60, slot=self.handleMove)
 
     def handleClick(self, event):
-        """ sigMouseClicked emits a QEvent (or subclass thereof)"""
+        """
+        Generate static I(V) plot in separate window on click
+        sigMouseClicked emits a QEvent (or subclass thereof)
+        """
 
         # filter for events inside image:
         pos = event.pos()
@@ -117,9 +116,12 @@ class TestWindow(QtWidgets.QWidget):
         pw.show()
 
     def handleMove(self, pos):
-        """ sigMouseMoved emits the position of the mouse"""
-
-        # SignalProxy wraps position of mouse into tuple
+        """
+        Use ExtendedCrossHair to track mouseposition.
+        Continuously update I(V) plot with I(V) from mouse positon.
+        sigMouseMoved emits the position of the mouse, which
+        SignalProxy wraps into tuple.
+        """
         try:
             pos = pos[0]
         except IndexError:
@@ -137,16 +139,29 @@ class TestWindow(QtWidgets.QWidget):
 
         # update crosshair
         # self.ch.setPos(xmp, ymp)
+        self.ch.curPos = (xmp, ymp)
         self.ch.vline.setPos(xmp)
         self.ch.hline.setPos(ymp)
 
         # update IV plot
         xdata = self.elist
-        ydata = self.dat3ds[ymp, xmp, :]
+        ydata = smooth(self.dat3d[ymp, xmp, :])
         pdi = pqg.PlotDataItem(xdata, ydata, pen='r')
         self.IVpltw.getPlotItem().clear()
         self.IVpltw.getPlotItem().addItem(pdi, clear=True)
         # self.IVpltw.show()
+
+    def keyPressEvent(self, event):
+        """ Scroll through images in self.dat3d using arrow keys"""
+        maxIdx = self.dat3d.shape[2] - 1
+        minIdx = 0
+        if (event.key() == QtCore.Qt.Key_Left) and (self.currentIndex >= minIdx + 1):
+            self.currentIndex -= 1
+            self.showImage(self.currentIndex)
+        elif (event.key() == QtCore.Qt.Key_Right) and (self.currentIndex <= maxIdx - 1):
+            self.currentIndex += 1
+            self.showImage(self.currentIndex)
+
 
 def smooth(inpt, window_len=10, window_type='flat'):
     """
@@ -176,18 +191,18 @@ def smooth(inpt, window_len=10, window_type='flat'):
     # this serves to remove noise in the smoothing method
     # w is the window matrix based on pre-defined window functions or unit matrix for flat window
 
-    s = np.r_[inpt[window_len-1:0:-1], inpt, inpt[-1:-window_len:-1]]
+    s = np.r_[inpt[window_len -1:0:-1], inpt, inpt[-1:-window_len:-1]]
     # w = eval('np.'+window_type+'(window_len)')
     if window_type == 'flat':  # moving average
         w = np.ones(window_len, 'd')
     else:
-        w = eval('np.'+window_type+'(window_len)')
+        w = eval('np.' + window_type + '(window_len)')
 
     # create smoothed data via numpy.convolve using the normalized input window matrix
-    otpt = np.convolve(w/w.sum(), s, mode='valid')
+    otpt = np.convolve(w / w.sum(), s, mode='valid')
 
     # format otpt to be same size as inpt and return
-    return otpt[int(window_len/2-1):-int(window_len/2)]
+    return otpt[int(window_len / 2 -1):-int(window_len / 2)]
 
 
 def main():
