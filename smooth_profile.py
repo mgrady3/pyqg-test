@@ -68,21 +68,24 @@ def smooth_loop(data):
             s[row, col] = smooth(data[row, col], window_type='flat', window_len=10)
     return s
 
-@jit
+@jit(nopython=True)
 def integrated_loop(data):
     # using flat window of length 10
     window_len = 10
-    w = np.ones(window_len, 'd')
-    out = np.empty((600, 592), dtype=object)
+    # w = np.ones(window_len, 'd')
+    n = np.ones(window_len) / float(window_len)
+    #out = np.empty((600, 592), dtype=object)
+    out = data.copy()
 
     for row in range(600):
         for col in range(592):
             inp = data[row, col, :]
             s = np.r_[inp[window_len-1:0:-1],inp,inp[-1:-window_len:-1]]
-            smth = np.convolve(w/w.sum(), s, mode='valid')
+            smth = np.convolve(n, s, mode='valid')
             # format to original size
             smth = smth[int(window_len/2 -1):-int(window_len/2)]
-            out[row, col] = smth
+            out[row, col, :] = smth
+    return out
 
 
 def main():

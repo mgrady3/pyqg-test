@@ -57,6 +57,8 @@ class TestWindow(QtWidgets.QWidget):
         self.elist = [-9.9]
         while len(self.elist) < self.dat3d.shape[2]:
             self.elist.append(round(self.elist[-1] + 0.1, 2))
+        self.dat3ds = self.dat3d.copy()
+        self.posMask = np.zeros((600, 592))
 
         # self.imageplot.setImage(self.dat3d[:, :, middle].T)
 
@@ -145,7 +147,13 @@ class TestWindow(QtWidgets.QWidget):
 
         # update IV plot
         xdata = self.elist
-        ydata = smooth(self.dat3d[ymp, xmp, :])
+
+        if self.posMask[ymp, xmp]:
+            ydata = self.dat3ds[ymp, xmp, :]
+        else:
+            ydata = smooth(self.dat3d[ymp, xmp, :])
+            self.dat3ds[ymp, xmp, :] = ydata
+            self.posMask[ymp, xmp] = 1
         pdi = pqg.PlotDataItem(xdata, ydata, pen='r')
         self.IVpltw.getPlotItem().clear()
         self.IVpltw.getPlotItem().addItem(pdi, clear=True)
