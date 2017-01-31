@@ -39,8 +39,15 @@ class LiveViewer(QtWidgets.QWidget):
         self.crosshair = ExtendedCrossHair()
 
         self.exp = None
+        self.setupData()
         self.load_experiment()
         self.setupEventHooks()
+        self.show()
+
+    def setupData(self):
+        dummydata = np.zeros((600,592))
+        self.image = pg.ImageItem(dummydata)
+        self.imageplotwidget.addItem(self.image)
 
     def setupEventHooks(self):
         """
@@ -49,8 +56,8 @@ class LiveViewer(QtWidgets.QWidget):
         """
         self.image.scene().sigMouseClicked.connect(self.handleClick)
 
-        sig = self.img.scene().sigMouseMoved
-        self.proxy = pqg.SignalProxy(signal=sig, rateLimit=60, slot=self.handleMouseMoved)
+        sig = self.image.scene().sigMouseMoved
+        self.proxy = pg.SignalProxy(signal=sig, rateLimit=60, slot=self.handleMouseMoved)
 
     def load_experiment(self):
         """
@@ -178,9 +185,9 @@ class LiveViewer(QtWidgets.QWidget):
         self.imageplotwidget.setImage(self.dat3d[:, :, idx])
 
     def handleClick(self, event):
-        print("Click registered...")
+        # print("Click registered...")
         pos = event.pos()
-        mappedPos = self.img.mapFromScene(pos)
+        mappedPos = self.image.mapFromScene(pos)
         xmp = int(mappedPos.x())
         ymp = int(mappedPos.y())
 
