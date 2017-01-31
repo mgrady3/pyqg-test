@@ -63,8 +63,8 @@ class LiveViewer(QtWidgets.QWidget):
         self.imageplotwidget.addItem(self.image)
 
     def setupEventHooks(self):
-        """ setup hooks for mouse clicks and mouse movement
-            key press events get tracked directly via overlaoding KeyPressEvent() """
+        """ Setup hooks for mouse clicks and mouse movement;
+            Key press events get tracked directly via overloading KeyPressEvent() """
         self.image.scene().sigMouseClicked.connect(self.handleClick)
 
         sig = self.image.scene().sigMouseMoved
@@ -170,6 +170,7 @@ class LiveViewer(QtWidgets.QWidget):
 
     @QtCore.pyqtSlot(np.ndarray)
     def retrieve_LEEM_data(self, data):
+        """ Grab the 3d numpy array emitted from the data loading I/O thread """
         self.dat3d = data
         self.posMask = np.zeros((self.dat3d.shape[0], self.dat3d.shape[1]))
         # print("LEEM data recieved from QThread.")
@@ -177,7 +178,7 @@ class LiveViewer(QtWidgets.QWidget):
 
     @QtCore.pyqtSlot()
     def update_img_after_load(self):
-        """ called upon thread emitting finished signal """
+        """ Called upon data lopading I/O thread emitting finished signal """
         # print("QThread has finished execution ...")
         self.currentIndex = self.dat3d.shape[2]//2
         self.image = pg.ImageItem(self.dat3d[:, :, self.currentIndex].T)
@@ -194,7 +195,7 @@ class LiveViewer(QtWidgets.QWidget):
         self.hasdisplayeddata = True
 
     def checkDataSize(self):
-        """ ensure initial array sizes all match """
+        """ Ensure initial array sizes all match """
         mainshape = self.dat3d.shape
         if self.dat3ds.shape != mainshape:
             self.dat3ds = np.zeros(mainshape)
