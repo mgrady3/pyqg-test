@@ -25,11 +25,11 @@ Execute the program by running 'python liveviewer.py'
 Python Version 2.7 or 3.4+ (No support for other legacy python version)
 The following packages are required:
 
-    * numpy
-    * PyQt and Qt version 5+
-    * pyqtgraph version 0.1+
-    * pyyaml
-    * PIL (Note: you should use Pillow, the Friendly Fork of PIL)
+    1. numpy
+    2. PyQt and Qt version 5+
+    3. pyqtgraph version 0.1+
+    4. pyyaml
+    5. PIL (Note: you should use Pillow, the Friendly Fork of PIL)
 
 All required packages can be installed via Pip or Anaconda - the python distribution
 and package manager provided by Continuum Analytics.
