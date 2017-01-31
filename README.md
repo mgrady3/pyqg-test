@@ -24,6 +24,7 @@ Execute the program by running 'python liveviewer.py'
 # Requirements:
 Python Version 2.7 or 3.4+ (No support for other legacy python version)
 The following packages are required:
+
     * numpy
     * PyQt and Qt version 5+
     * pyqtgraph version 0.1+
