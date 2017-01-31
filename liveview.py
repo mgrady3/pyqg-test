@@ -39,6 +39,7 @@ class LiveViewer(QtWidgets.QWidget):
         self.crosshair = ExtendedCrossHair()
 
         self.exp = None
+        self.hasdisplayeddata = False
         self.setupData()
         self.load_experiment()
         self.setupEventHooks()
@@ -164,11 +165,11 @@ class LiveViewer(QtWidgets.QWidget):
     def retrieve_LEEM_data(self, data):
         self.dat3d = data
         self.posMask = np.zeros((self.dat3d.shape[0], self.dat3d.shape[1]))
-        print("LEEM data recieved from QThread.")
+        # print("LEEM data recieved from QThread.")
         return
 
     def update_img_after_load(self):
-        print("QThread has finished execution ...")
+        # print("QThread has finished execution ...")
         self.currentIndex = self.dat3d.shape[2]//2
         self.image = pg.ImageItem(self.dat3d[:, :, self.currentIndex].T)
         self.imageplotwidget.addItem(self.image)
@@ -180,12 +181,22 @@ class LiveViewer(QtWidgets.QWidget):
         self.elist = [self.exp.mine]
         while len(self.elist) < self.dat3d.shape[2]:
             self.elist.append(round(self.elist[-1] + self.exp.stepe, 2))
+        self.checkDataSize()
+        self.hasdisplayeddata = True
+
+    def checkDataSize(self):
+        """ ensure initial array sizes all match """
+        mainshape = self.dat3d.shape
+        if self.dat3ds.shape != mainshape:
+            self.dat3ds = np.zeros(mainshape)
+        if self.posMask.shape != (mainshape[0], mainshape[1]):
+            self.posMask = np.zeros((mainshape[0], mainshape[1]))
 
     def showImage(self, idx):
         """ Display image from main data array at index=idx """
         if idx not in range(self.dat3d.shape[2] - 1):
             return
-        self.imageplotwidget.setImage(self.dat3d[:, :, idx])
+        self.image.setImage(self.dat3d[:, :, idx].T)
 
     def handleClick(self, event):
         # print("Click registered...")
@@ -206,6 +217,8 @@ class LiveViewer(QtWidgets.QWidget):
         pw.show()
 
     def handleMouseMoved(self, pos):
+        if not self.hasdisplayeddata:
+            return
         try:
             pos = pos[0]
         except IndexError:
@@ -239,6 +252,17 @@ class LiveViewer(QtWidgets.QWidget):
         pdi = pg.PlotDataItem(xdata, ydata, pen='r')
         self.ivplotwidget.getPlotItem().clear()
         self.ivplotwidget.getPlotItem().addItem(pdi, clear=True)
+
+    def keyPressEvent(self, event):
+        """ Set arrow keys to advance LEEM image """
+        maxIdx = self.dat3d.shape[2] - 1
+        minIdx = 0
+        if (event.key() == QtCore.Qt.Key_Left) and (self.currentIndex >= minIdx + 1):
+            self.currentIndex -= 1
+            self.showImage(self.currentIndex)
+        elif (event.key() == QtCore.Qt.Key_Right) and (self.currentIndex <= maxIdx - 1):
+            self.currentIndex += 1
+            self.showImage(self.currentIndex)
 
 
 def main():
