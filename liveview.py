@@ -26,7 +26,7 @@ class ExtendedCrossHair(QtCore.QObject):
 
 
 class LiveViewer(QtWidgets.QWidget):
-    """ LEEM data analysis in real-time """
+    """ LEEM data analysis in real-time: Main Window """
     def __init__(self, parent=None):
         super(QtWidgets.QWidget, self).__init__()
 
