@@ -25,12 +25,37 @@ class ExtendedCrossHair(QtCore.QObject):
         self.curPos = (0, 0)  # store (x, y) mouse position
 
 
+class MainWindow(QtWidgets.QMainWindow):
+    """ top level conatiner """
+    def __init__(self):
+        super(QtWidgets.QMainWindow, self).__init__()
+        self.lv = LiveViewer()
+        self.setCentralWidget(self.lv)
+        self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.lv.dockwidget)
+
+
+
 class LiveViewer(QtWidgets.QWidget):
     """ LEEM data analysis in real-time: Main Window """
     def __init__(self, parent=None):
         super(QtWidgets.QWidget, self).__init__()
 
         self.layout = QtWidgets.QHBoxLayout()
+
+        self.dockwidget = QtWidgets.QDockWidget(self)
+        self.groupbox = QtWidgets.QGroupBox()
+        self.buttonboxlayout = QtWidgets.QVBoxLayout()
+        self.loadexperimentbutton = QtWidgets.QPushButton("Load Experiment")
+        self.loadexperimentbutton.clicked.connect(self.load_experiment)
+        self.quitbutton = QtWidgets.QPushButton("Quit")
+        self.quitbutton.clicked.connect(self.quit)
+        self.buttonboxlayout.addWidget(self.loadexperimentbutton)
+        self.buttonboxlayout.addStretch()
+        self.buttonboxlayout.addWidget(self.quitbutton)
+        self.groupbox.setLayout(self.buttonboxlayout)
+        self.dockwidget.setWidget(self.groupbox)
+        # self.dockwidget.setFloating(True)
+        # self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.dockwidget)
 
         self.imageplotwidget = pg.PlotWidget()
         self.imageplotwidget.setTitle("LEEM Real Space Image")
@@ -43,12 +68,10 @@ class LiveViewer(QtWidgets.QWidget):
 
         self.setLayout(self.layout)
 
-        self.crosshair = ExtendedCrossHair()
-
         self.exp = None
         self.hasdisplayeddata = False
         self.setupData()
-        self.load_experiment()
+        # self.load_experiment()
         self.setupEventHooks()
         self.show()
 
@@ -180,11 +203,17 @@ class LiveViewer(QtWidgets.QWidget):
     def update_img_after_load(self):
         """ Called upon data lopading I/O thread emitting finished signal """
         # print("QThread has finished execution ...")
+        if self.hasdisplayeddata:
+            self.imageplotwidget.getPlotItem().clear()
+
         self.currentIndex = self.dat3d.shape[2]//2
         self.image = pg.ImageItem(self.dat3d[:, :, self.currentIndex].T)
         self.imageplotwidget.addItem(self.image)
         self.imageplotwidget.hideAxis('bottom')
         self.imageplotwidget.hideAxis('left')
+
+        # reset new crosshair on load to force crosshair on top of image
+        self.crosshair = ExtendedCrossHair()
         self.imageplotwidget.addItem(self.crosshair.hline, ignoreBounds=True)
         self.imageplotwidget.addItem(self.crosshair.vline, ignoreBounds=True)
 
@@ -278,11 +307,17 @@ class LiveViewer(QtWidgets.QWidget):
             self.currentIndex += 1
             self.showImage(self.currentIndex)
 
+    @staticmethod
+    def quit():
+        QtWidgets.QApplication.instance().quit()
+
 
 def main():
     app = QtWidgets.QApplication(sys.argv)
-    lv = LiveViewer()
-    lv.show()
+    #lv = LiveViewer()
+    #lv.show()
+    mw = MainWindow()
+    mw.show()
     sys.exit(app.exec_())
 
 if __name__ == '__main__':
