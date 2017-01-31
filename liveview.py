@@ -1,3 +1,10 @@
+"""
+LiveViewer - A program for rapid analysis of LEEM-I(V) data sets
+Author: Maxwell Grady
+Affiliation: University of New Hampshire Department of Physics - Pohl group
+Version: 0.1.0
+Date: January 31, 2017
+"""
 import os
 import sys
 import yaml
@@ -10,7 +17,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 
 
 class ExtendedCrossHair(QtCore.QObject):
-    """ set of perpindicular InfiniteLines tracking mouse postion """
+    """ Set of perpindicular InfiniteLines tracking mouse postion """
     def __init__(self):
         super(ExtendedCrossHair, self).__init__()
         self.hline = pg.InfiniteLine(angle=0, movable=False)
@@ -46,6 +53,9 @@ class LiveViewer(QtWidgets.QWidget):
         self.show()
 
     def setupData(self):
+        """ Setup dummy data to ensure all arrays are present in case of long load time
+            Note: the self.hasdisplayeddata flag should also ensure no attempt to access
+            arrays before laoding has completed """
         self.dat3d = np.zeros((600,592,250))  # dummy data - will get overwritten on load
         self.dat3ds = self.dat3d.copy()  # will get filled with smoothed data as needed
         self.posMask = np.zeros((600,592))  # will get resized on load
@@ -53,19 +63,16 @@ class LiveViewer(QtWidgets.QWidget):
         self.imageplotwidget.addItem(self.image)
 
     def setupEventHooks(self):
-        """
-        setup hooks for mouse clicks and mouse movement
-        key press events get tracked directly via overlaoding KeyPressEvent()
-        """
+        """ setup hooks for mouse clicks and mouse movement
+            key press events get tracked directly via overlaoding KeyPressEvent() """
         self.image.scene().sigMouseClicked.connect(self.handleClick)
 
         sig = self.image.scene().sigMouseMoved
         self.proxy = pg.SignalProxy(signal=sig, rateLimit=60, slot=self.handleMouseMoved)
 
     def load_experiment(self):
-        """
-        :return none
-        """
+        """ Query User for YAML experiment config file to load experiment settings
+            Adapted from my other project https://www.github.com/mgrady3/pLEASE """
         # On Windows 10 there seems to be an error where files are not displayed in the FileDialog
         # The user may select a directory they know to contain a .yaml file but no files are shown
         # one possible work around may be to use options=QtGui.QFileDialog.DontUseNativeDialog
@@ -168,7 +175,9 @@ class LiveViewer(QtWidgets.QWidget):
         # print("LEEM data recieved from QThread.")
         return
 
+    @QtCore.pyqtSlot()
     def update_img_after_load(self):
+        """ called upon thread emitting finished signal """
         # print("QThread has finished execution ...")
         self.currentIndex = self.dat3d.shape[2]//2
         self.image = pg.ImageItem(self.dat3d[:, :, self.currentIndex].T)
@@ -199,6 +208,9 @@ class LiveViewer(QtWidgets.QWidget):
         self.image.setImage(self.dat3d[:, :, idx].T)
 
     def handleClick(self, event):
+        """ User click in image area """
+        if not self.hasdisplayeddata:
+            return
         # print("Click registered...")
         pos = event.pos()
         mappedPos = self.image.mapFromScene(pos)
@@ -217,6 +229,7 @@ class LiveViewer(QtWidgets.QWidget):
         pw.show()
 
     def handleMouseMoved(self, pos):
+        """ Track mouse movement within image area """
         if not self.hasdisplayeddata:
             return
         try:
