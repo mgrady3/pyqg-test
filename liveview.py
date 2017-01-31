@@ -45,8 +45,10 @@ class LiveViewer(QtWidgets.QWidget):
         self.show()
 
     def setupData(self):
-        dummydata = np.zeros((600,592))
-        self.image = pg.ImageItem(dummydata)
+        self.dat3d = np.zeros((600,592,250))  # dummy data - will get overwritten on load
+        self.dat3ds = self.dat3d.copy()  # will get filled with smoothed data as needed
+        self.posMask = np.zeros((600,592))  # will get resized on load
+        self.image = pg.ImageItem(self.dat3d[:,:, 0])
         self.imageplotwidget.addItem(self.image)
 
     def setupEventHooks(self):
@@ -161,6 +163,7 @@ class LiveViewer(QtWidgets.QWidget):
     @QtCore.pyqtSlot(np.ndarray)
     def retrieve_LEEM_data(self, data):
         self.dat3d = data
+        self.posMask = np.zeros((self.dat3d.shape[0], self.dat3d.shape[1]))
         print("LEEM data recieved from QThread.")
         return
 
@@ -203,7 +206,40 @@ class LiveViewer(QtWidgets.QWidget):
         pw.show()
 
     def handleMouseMoved(self, pos):
-        pass
+        try:
+            pos = pos[0]
+        except IndexError:
+            return
+
+        mappedPos = self.image.mapFromScene(pos)
+        xmp = int(mappedPos.x())
+        ymp = int(mappedPos.y())
+
+        if xmp < 0 or \
+           xmp > self.dat3d.shape[1] - 1 or \
+           ymp < 0 or \
+           ymp > self.dat3d.shape[0] - 1:
+            return  # discard  movement events originating outside the image
+
+        # update crosshair
+        # self.ch.setPos(xmp, ymp)
+        self.crosshair.curPos = (xmp, ymp)
+        self.crosshair.vline.setPos(xmp)
+        self.crosshair.hline.setPos(ymp)
+
+        # update IV plot
+        xdata = self.elist
+
+        if self.posMask[ymp, xmp]:
+            ydata = self.dat3ds[ymp, xmp, :]
+        else:
+            ydata = LF.smooth(self.dat3d[ymp, xmp, :], window_len=10, window_type='flat')
+            self.dat3ds[ymp, xmp, :] = ydata
+            self.posMask[ymp, xmp] = 1
+        pdi = pg.PlotDataItem(xdata, ydata, pen='r')
+        self.ivplotwidget.getPlotItem().clear()
+        self.ivplotwidget.getPlotItem().addItem(pdi, clear=True)
+
 
 def main():
     app = QtWidgets.QApplication(sys.argv)
