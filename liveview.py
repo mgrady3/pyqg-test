@@ -125,7 +125,7 @@ class LiveViewer(QtWidgets.QWidget):
                                       **self.labelStyle)
         self.layout.addWidget(self.imageplotwidget)
 
-        self.ivplotwidget = pg.PlotWidget()
+        self.ivplotwidget = pg.PlotWidget(parent=self)
         self.ivplotwidget.setLabel('bottom',
                                    'Energy', units='eV',
                                    **self.labelStyle)
@@ -209,7 +209,6 @@ class LiveViewer(QtWidgets.QWidget):
         print("Loaded the following settings:")
 
         yaml.dump(self.exp.loaded_settings, stream=sys.stdout)
-        # self.pp.pprint(exp.loaded_settings)
 
         if self.exp.exp_type == 'LEEM':
             self.load_LEEM_experiment()
@@ -278,7 +277,7 @@ class LiveViewer(QtWidgets.QWidget):
 
     @QtCore.pyqtSlot()
     def update_img_after_load(self):
-        """Called upon data lopading I/O thread emitting finished signal."""
+        """Called upon data loading I/O thread emitting finished signal."""
         # print("QThread has finished execution ...")
         if self.hasdisplayeddata:
             self.imageplotwidget.getPlotItem().clear()
@@ -302,6 +301,7 @@ class LiveViewer(QtWidgets.QWidget):
         title = "Real Space LEEM Image: {} eV"
         energy = LF.filenumber_to_energy(self.elist, self.currentIndex)
         self.imageplotwidget.setTitle(title.format(energy), **self.labelStyle)
+        self.imageplotwidget.setFocus()
 
     def checkDataSize(self):
         """Ensure initial array sizes all match."""
@@ -417,7 +417,7 @@ class LiveViewer(QtWidgets.QWidget):
 
 
 def custom_exception_handler(exc_type, exc_value, exc_traceback):
-    """Allow printing of unhandled exceptions before Qt Aborts."""
+    """Allow printing of unhandled exceptions instead of Qt Abort."""
     if issubclass(exc_type, KeyboardInterrupt):
         QtWidgets.QApplication.instance().quit()
 
