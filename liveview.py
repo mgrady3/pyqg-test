@@ -7,6 +7,7 @@ Date: January 31, 2017
 """
 import os
 import sys
+import traceback
 import yaml
 import LEEMFUNCTIONS as LF
 import numpy as np
@@ -97,6 +98,8 @@ class LiveViewer(QtWidgets.QWidget):
         super(QtWidgets.QWidget, self).__init__()
 
         self.layout = QtWidgets.QHBoxLayout()
+        self.labelStyle = {'color': '#FFFFFF',
+                           'font-size': '16pt'}
 
         self.dockwidget = QtWidgets.QDockWidget(self)
         self.groupbox = QtWidgets.QGroupBox()
@@ -118,12 +121,17 @@ class LiveViewer(QtWidgets.QWidget):
         self.bottomdock.setWidget(self.console)
 
         self.imageplotwidget = pg.PlotWidget()
-        self.imageplotwidget.setTitle("LEEM Real Space Image")
+        self.imageplotwidget.setTitle("LEEM Real Space Image",
+                                      **self.labelStyle)
         self.layout.addWidget(self.imageplotwidget)
 
         self.ivplotwidget = pg.PlotWidget()
-        self.ivplotwidget.setLabel('bottom', 'Energy', units='eV')
-        self.ivplotwidget.setLabel('left', 'Intensity', units='arb units')
+        self.ivplotwidget.setLabel('bottom',
+                                   'Energy', units='eV',
+                                   **self.labelStyle)
+        self.ivplotwidget.setLabel('left',
+                                   'Intensity', units='arb units',
+                                   **self.labelStyle)
         self.layout.addWidget(self.ivplotwidget)
 
         self.setLayout(self.layout)
@@ -293,7 +301,7 @@ class LiveViewer(QtWidgets.QWidget):
         self.hasdisplayeddata = True
         title = "Real Space LEEM Image: {} eV"
         energy = LF.filenumber_to_energy(self.elist, self.currentIndex)
-        self.imageplotwidget.setTitle(title.format(energy))
+        self.imageplotwidget.setTitle(title.format(energy), **self.labelStyle)
 
     def checkDataSize(self):
         """Ensure initial array sizes all match."""
@@ -309,11 +317,20 @@ class LiveViewer(QtWidgets.QWidget):
             return
         self.image.setImage(self.dat3d[:, :, idx].T)
 
+    def outputData(self, data):
+        """Output I(V) curve to text."""
+        caption = "Enter file name for output."
+        fileName = QtGui.QFileDialog.getSaveFileName(self,
+                                                     caption=caption)
+        print(str(fileName))
+
     def handleClick(self, event):
         """User click in image area."""
         if not self.hasdisplayeddata:
             return
         # print("Click registered...")
+        if event.currentItem is None:
+            return
         pos = event.pos()
         mappedPos = self.image.mapFromScene(pos)
         xmp = int(mappedPos.x())
@@ -324,10 +341,14 @@ class LiveViewer(QtWidgets.QWidget):
            ymp < 0 or \
            ymp > self.dat3d.shape[0]:
             return  # discard click events originating outside the image
-
-        pw = pg.plot(self.elist, self.dat3d[ymp, xmp, :], title='LEEM-I(V)')
-        pw.setLabel('bottom', 'Energy', units='eV')
-        pw.setLabel('left', 'Intensity', units='a.u.')
+        try:
+            pw = pg.plot(self.elist,
+                         self.dat3d[ymp, xmp, :],
+                         title='LEEM-I(V)')
+        except IndexError:
+            return
+        pw.setLabel('bottom', 'Energy', units='eV', **self.labelStyle)
+        pw.setLabel('left', 'Intensity', units='a.u.', **self.labelStyle)
         pw.show()
 
     def handleMouseMoved(self, pos):
@@ -391,7 +412,18 @@ class LiveViewer(QtWidgets.QWidget):
         QtWidgets.QApplication.instance().quit()
 
 
+def custom_exception_handler(exc_type, exc_value, exc_traceback):
+    """Allow printing of unhandled exceptions before Qt Aborts."""
+    if issubclass(exc_type, KeyboardInterrupt):
+        QtWidgets.QApplication.instance().quit()
+
+    print("".join(traceback.format_exception(exc_type,
+                                             exc_value,
+                                             exc_traceback)))
+
+
 def main():
+    sys.excepthook = custom_exception_handler
     app = QtWidgets.QApplication(sys.argv)
     mw = MainWindow()
     mw.show()
