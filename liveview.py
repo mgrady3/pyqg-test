@@ -1,5 +1,5 @@
-"""
-LiveViewer - A program for rapid analysis of LEEM-I(V) data sets
+"""LiveViewer - A program for rapid analysis of LEEM-I(V) data sets.
+
 Author: Maxwell Grady
 Affiliation: University of New Hampshire Department of Physics - Pohl group
 Version: 0.1.0
@@ -15,8 +15,10 @@ from experiment import Experiment
 from qthreads import WorkerThread
 from PyQt5 import QtCore, QtGui, QtWidgets
 
+
 class CustomStream(QtCore.QObject):
-    """ Send messages to arbitrary Widget """
+    """Send messages to arbitrary Widget."""
+
     message = QtCore.pyqtSignal(str)
 
     def __init__(self):
@@ -28,8 +30,10 @@ class CustomStream(QtCore.QObject):
     def flush(self):
         pass
 
+
 class ExtendedCrossHair(QtCore.QObject):
-    """ Set of perpindicular InfiniteLines tracking mouse postion """
+    """Set of perpindicular InfiniteLines tracking mouse postion."""
+
     def __init__(self):
         super(ExtendedCrossHair, self).__init__()
         self.hline = pg.InfiniteLine(angle=0, movable=False)
@@ -38,7 +42,10 @@ class ExtendedCrossHair(QtCore.QObject):
 
 
 class MainWindow(QtWidgets.QMainWindow):
-    """ top level conatiner """
+    """Top level conatiner to wrap LiveViewer object.
+    Provides dockable interface.
+    """
+
     def __init__(self):
         super(QtWidgets.QMainWindow, self).__init__()
         self.lv = LiveViewer()
@@ -46,10 +53,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.lv.dockwidget)
         self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, self.lv.bottomdock)
 
+
 class MessageConsole(QtWidgets.QWidget):
-    """ QTextArea to collect messages rerouted from sys.stdout
-        Will be contained in a DockWidget dockable to the bottom
-        of the main window """
+    """QTextArea to collect messages rerouted from sys.stdout.
+    Will be contained in a DockWidget dockable to the bottom
+    of the main window.
+    """
+
     def __init__(self):
         super(QtWidgets.QWidget, self).__init__()
         layout = QtWidgets.QVBoxLayout()
@@ -67,20 +77,20 @@ class MessageConsole(QtWidgets.QWidget):
 
     @QtCore.pyqtSlot(str)
     def set_message(self, message):
+        """Update QTextEdit with string from sys.stdout or sys.stderr."""
         self.textedit.moveCursor(QtGui.QTextCursor.End)
         self.textedit.insertPlainText(message)
 
     def closeEvent(self, event):
+        """Override closeEvent to reset sys.stdout and sys.stderr."""
         sys.stdout = sys.__stdout__
         sys.stderr = sys.__stderr__
         super(MessageConsole, self).closeEvent(event)
 
 
-
-
-
 class LiveViewer(QtWidgets.QWidget):
-    """ LEEM data analysis in real-time: Main Window """
+    """LEEM data analysis in real-time: Main Window"""
+
     def __init__(self, parent=None):
         super(QtWidgets.QWidget, self).__init__()
 
@@ -105,7 +115,6 @@ class LiveViewer(QtWidgets.QWidget):
         self.console = MessageConsole()
         self.bottomdock.setWidget(self.console)
 
-
         self.imageplotwidget = pg.PlotWidget()
         self.imageplotwidget.setTitle("LEEM Real Space Image")
         self.layout.addWidget(self.imageplotwidget)
@@ -125,48 +134,54 @@ class LiveViewer(QtWidgets.QWidget):
         self.show()
 
     def setupData(self):
-        """ Setup dummy data to ensure all arrays are present in case of long load time
-            Note: the self.hasdisplayeddata flag should also ensure no attempt to access
-            arrays before laoding has completed """
-        self.dat3d = np.zeros((600,592,250))  # dummy data - will get overwritten on load
-        self.dat3ds = self.dat3d.copy()  # will get filled with smoothed data as needed
-        self.posMask = np.zeros((600,592))  # will get resized on load
-        self.image = pg.ImageItem(self.dat3d[:,:, 0])
+        """Setup dummy data to ensure all arrays are present
+        in case of long load time.
+        Note: the self.hasdisplayeddata flag should also ensure
+        no attempt to access arrays before laoding has completed.
+        """
+        # dummy data - will get overwritten/resized as needed
+        self.dat3d = np.zeros((600, 592, 250))
+        self.dat3ds = self.dat3d.copy()
+        self.posMask = np.zeros((600, 592))
+        self.image = pg.ImageItem(self.dat3d[:, :, 0])
         self.imageplotwidget.addItem(self.image)
 
     def setupEventHooks(self):
         """ Setup hooks for mouse clicks and mouse movement;
-            Key press events get tracked directly via overloading KeyPressEvent() """
+        Key press events tracked directly via overloading KeyPressEvent().
+        """
         self.image.scene().sigMouseClicked.connect(self.handleClick)
 
         sig = self.image.scene().sigMouseMoved
-        self.proxy = pg.SignalProxy(signal=sig, rateLimit=60, slot=self.handleMouseMoved)
+        self.proxy = pg.SignalProxy(signal=sig,
+                                    rateLimit=60,
+                                    slot=self.handleMouseMoved)
 
     def load_experiment(self):
-        """ Query User for YAML experiment config file to load experiment settings
-            Adapted from my other project https://www.github.com/mgrady3/pLEASE """
-        # On Windows 10 there seems to be an error where files are not displayed in the FileDialog
-        # The user may select a directory they know to contain a .yaml file but no files are shown
-        # one possible work around may be to use options=QtGui.QFileDialog.DontUseNativeDialog
-        # but this changes the entire look and feel of the window. Thus is not an ideal solution
+        """ Query User for YAML config file to load experiment settings
+        Adapted from my other project https://www.github.com/mgrady3/pLEASE
+        """
 
         yamlFilter = "YAML (*.yaml);;YML (*.yml);;All Files (*)"
         homeDir = os.getenv("HOME")
+        caption = "Select YAML Experiment Config File"
         fileName = QtGui.QFileDialog.getOpenFileName(parent=None,
-                                                    caption="Select YAML Experiment Config File",
-                                                    directory=homeDir,
-                                                    filter=yamlFilter)
+                                                     caption=caption,
+                                                     directory=homeDir,
+                                                     filter=yamlFilter)
         if isinstance(fileName, str):
             config = fileName  # string path to .yaml or .yml config file
         elif isinstance(fileName, tuple):
             try:
                 config = fileName[0]
             except IndexError:
-                print('No Config file found. Please Select a directory with a .yaml file')
+                print('No Config file found.')
+                print('Please Select a directory with a .yaml file.')
                 print('Loading Canceled ...')
                 return
         else:
-            print('No Config file found. Please Select a directory with a .yaml file')
+            print('No Config file found.')
+            print('Please Select a directory with a .yaml file.')
             print('Loading Canceled ...')
             return
         if config == '':
@@ -182,7 +197,7 @@ class LiveViewer(QtWidgets.QWidget):
         self.exp.fromFile(config)
         print("New Data Path loaded from file: {}".format(self.exp.path))
         print("Loaded the following settings:")
-        # yaml.dump(self.exp.loaded_settings, stream=self.message_console.stream)
+
         yaml.dump(self.exp.loaded_settings, stream=sys.stdout)
         # self.pp.pprint(exp.loaded_settings)
 
@@ -196,11 +211,11 @@ class LiveViewer(QtWidgets.QWidget):
         else:
             print("Error: Unrecognized Experiment Type in YAML Config file")
             print("Valid Experiment Types for LiveViewer are LEEM")
-            print("Please refer to Experiment.yaml for documentation on valid YAML config files")
+            print("Please refer to Experiment.yaml for documentation.")
             return
 
     def load_LEEM_experiment(self):
-        """ Load LEEM data from settings described by YAML config file """
+        """Load LEEM data from settings described by YAML config file."""
         if self.exp is None:
             return
         if self.exp.data_type.lower() == 'raw':
@@ -214,12 +229,13 @@ class LiveViewer(QtWidgets.QWidget):
                 try:
                     self.thread.disconnect()
                 except TypeError:
-                    pass  # no signals were connected, that is OK, continue as needed
+                    pass  # no signals connected, that's OK, continue as needed
                 self.thread.connectOutputSignal(self.retrieve_LEEM_data)
                 self.thread.finished.connect(self.update_img_after_load)
                 self.thread.start()
             except ValueError:
-                print("Error loading LEEM Experiment: Please Verify Experiment Config Settings")
+                print("Error loading LEEM Experiment:")
+                print("Please Verify Experiment Config Settings.")
                 return
 
         elif self.exp.data_type.lower() == 'image':
@@ -230,19 +246,21 @@ class LiveViewer(QtWidgets.QWidget):
                 try:
                     self.thread.disconnect()
                 except TypeError:
-                    pass  # no signals were connected, that is OK, continue as needed
+                    pass  # no signals connected, that's OK, continue as needed
                 self.thread.connectOutputSignal(self.retrieve_LEEM_data)
                 self.thread.finished.connect(self.update_img_after_load)
                 self.thread.start()
             except ValueError:
-                print('Error loading LEEM data from images. Please check YAML experiment config file')
-                print('Required parameters to load images from YAML config: path, ext')
-                print('Check for valid data path and valid file extensions: \'.tif\' and \'.png\'.')
+                print('Error loading LEEM data from images.')
+                print('Please check YAML experiment config file')
+                print('Required parameters: path, ext')
+                print('Check for valid data path')
+                print('Check file extensions: \'.tif\' and \'.png\'.')
                 return
 
     @QtCore.pyqtSlot(np.ndarray)
     def retrieve_LEEM_data(self, data):
-        """ Grab the 3d numpy array emitted from the data loading I/O thread """
+        """Grab the 3d numpy array emitted from the data loading I/O thread."""
         self.dat3d = data
         self.posMask = np.zeros((self.dat3d.shape[0], self.dat3d.shape[1]))
         # print("LEEM data recieved from QThread.")
@@ -250,7 +268,7 @@ class LiveViewer(QtWidgets.QWidget):
 
     @QtCore.pyqtSlot()
     def update_img_after_load(self):
-        """ Called upon data lopading I/O thread emitting finished signal """
+        """Called upon data lopading I/O thread emitting finished signal."""
         # print("QThread has finished execution ...")
         if self.hasdisplayeddata:
             self.imageplotwidget.getPlotItem().clear()
@@ -273,7 +291,7 @@ class LiveViewer(QtWidgets.QWidget):
         self.hasdisplayeddata = True
 
     def checkDataSize(self):
-        """ Ensure initial array sizes all match """
+        """Ensure initial array sizes all match."""
         mainshape = self.dat3d.shape
         if self.dat3ds.shape != mainshape:
             self.dat3ds = np.zeros(mainshape)
@@ -281,13 +299,13 @@ class LiveViewer(QtWidgets.QWidget):
             self.posMask = np.zeros((mainshape[0], mainshape[1]))
 
     def showImage(self, idx):
-        """ Display image from main data array at index=idx """
+        """Display image from main data array at index=idx."""
         if idx not in range(self.dat3d.shape[2] - 1):
             return
         self.image.setImage(self.dat3d[:, :, idx].T)
 
     def handleClick(self, event):
-        """ User click in image area """
+        """User click in image area."""
         if not self.hasdisplayeddata:
             return
         # print("Click registered...")
@@ -308,7 +326,7 @@ class LiveViewer(QtWidgets.QWidget):
         pw.show()
 
     def handleMouseMoved(self, pos):
-        """ Track mouse movement within image area """
+        """Track mouse movement within image area."""
         if not self.hasdisplayeddata:
             return
         try:
@@ -338,7 +356,9 @@ class LiveViewer(QtWidgets.QWidget):
         if self.posMask[ymp, xmp]:
             ydata = self.dat3ds[ymp, xmp, :]
         else:
-            ydata = LF.smooth(self.dat3d[ymp, xmp, :], window_len=10, window_type='flat')
+            ydata = LF.smooth(self.dat3d[ymp, xmp, :],
+                              window_len=10,
+                              window_type='flat')
             self.dat3ds[ymp, xmp, :] = ydata
             self.posMask[ymp, xmp] = 1
         pdi = pg.PlotDataItem(xdata, ydata, pen='r')
@@ -346,13 +366,15 @@ class LiveViewer(QtWidgets.QWidget):
         self.ivplotwidget.getPlotItem().addItem(pdi, clear=True)
 
     def keyPressEvent(self, event):
-        """ Set arrow keys to advance LEEM image """
+        """Set arrow keys to advance LEEM image."""
         maxIdx = self.dat3d.shape[2] - 1
         minIdx = 0
-        if (event.key() == QtCore.Qt.Key_Left) and (self.currentIndex >= minIdx + 1):
+        if (event.key() == QtCore.Qt.Key_Left) and \
+           (self.currentIndex >= minIdx + 1):
             self.currentIndex -= 1
             self.showImage(self.currentIndex)
-        elif (event.key() == QtCore.Qt.Key_Right) and (self.currentIndex <= maxIdx - 1):
+        elif (event.key() == QtCore.Qt.Key_Right) and \
+             (self.currentIndex <= maxIdx - 1):
             self.currentIndex += 1
             self.showImage(self.currentIndex)
 
@@ -363,11 +385,10 @@ class LiveViewer(QtWidgets.QWidget):
 
 def main():
     app = QtWidgets.QApplication(sys.argv)
-    #lv = LiveViewer()
-    #lv.show()
     mw = MainWindow()
     mw.show()
     sys.exit(app.exec_())
+
 
 if __name__ == '__main__':
     main()
