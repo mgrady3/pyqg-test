@@ -328,9 +328,13 @@ class LiveViewer(QtWidgets.QWidget):
         """User click in image area."""
         if not self.hasdisplayeddata:
             return
-        # print("Click registered...")
+
+        # clicking outside image area may cause event.currentItem
+        # to be None. This would then raise an error when trying to
+        # call event.pos()
         if event.currentItem is None:
             return
+
         pos = event.pos()
         mappedPos = self.image.mapFromScene(pos)
         xmp = int(mappedPos.x())
