@@ -48,6 +48,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def __init__(self):
         super(QtWidgets.QMainWindow, self).__init__()
+        self.setWindowTitle("LiveViewer")
         self.lv = LiveViewer()
         self.setCentralWidget(self.lv)
         self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.lv.dockwidget)
@@ -64,6 +65,7 @@ class MessageConsole(QtWidgets.QWidget):
         super(QtWidgets.QWidget, self).__init__()
         layout = QtWidgets.QVBoxLayout()
         self.textedit = QtWidgets.QTextEdit()
+        self.textedit.setReadOnly(True)
         layout.addWidget(self.textedit)
         self.setLayout(layout)
 
@@ -289,6 +291,9 @@ class LiveViewer(QtWidgets.QWidget):
             self.elist.append(round(self.elist[-1] + self.exp.stepe, 2))
         self.checkDataSize()
         self.hasdisplayeddata = True
+        title = "Real Space LEEM Image: {} eV"
+        energy = LF.filenumber_to_energy(self.elist, self.currentIndex)
+        self.imageplotwidget.setTitle(title.format(energy))
 
     def checkDataSize(self):
         """Ensure initial array sizes all match."""
@@ -377,6 +382,9 @@ class LiveViewer(QtWidgets.QWidget):
              (self.currentIndex <= maxIdx - 1):
             self.currentIndex += 1
             self.showImage(self.currentIndex)
+        title = "Real Space LEEM Image: {} eV"
+        energy = LF.filenumber_to_energy(self.elist, self.currentIndex)
+        self.imageplotwidget.setTitle(title.format(energy))
 
     @staticmethod
     def quit():
