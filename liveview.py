@@ -15,6 +15,18 @@ from experiment import Experiment
 from qthreads import WorkerThread
 from PyQt5 import QtCore, QtGui, QtWidgets
 
+class CustomStream(QtCore.QObject):
+    """ Send messages to arbitrary Widget """
+    message = QtCore.pyqtSignal(str)
+
+    def __init__(self):
+        super(QtCore.QObject, self).__init__()
+
+    def write(self, message):
+        self.message.emit(str(message))
+
+    def flush(self):
+        pass
 
 class ExtendedCrossHair(QtCore.QObject):
     """ Set of perpindicular InfiniteLines tracking mouse postion """
@@ -32,6 +44,38 @@ class MainWindow(QtWidgets.QMainWindow):
         self.lv = LiveViewer()
         self.setCentralWidget(self.lv)
         self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.lv.dockwidget)
+        self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, self.lv.bottomdock)
+
+class MessageConsole(QtWidgets.QWidget):
+    """ QTextArea to collect messages rerouted from sys.stdout
+        Will be contained in a DockWidget dockable to the bottom
+        of the main window """
+    def __init__(self):
+        super(QtWidgets.QWidget, self).__init__()
+        layout = QtWidgets.QVBoxLayout()
+        self.textedit = QtWidgets.QTextEdit()
+        layout.addWidget(self.textedit)
+        self.setLayout(layout)
+
+        self.stream = CustomStream()
+        self.stream.message.connect(self.set_message)
+
+        sys.stdout = self.stream
+        sys.stderr = self.stream
+
+        self.show()
+
+    @QtCore.pyqtSlot(str)
+    def set_message(self, message):
+        self.textedit.moveCursor(QtGui.QTextCursor.End)
+        self.textedit.insertPlainText(message)
+
+    def closeEvent(self, event):
+        sys.stdout = sys.__stdout__
+        sys.stderr = sys.__stderr__
+        super(MessageConsole, self).closeEvent(event)
+
+
 
 
 
@@ -56,6 +100,11 @@ class LiveViewer(QtWidgets.QWidget):
         self.dockwidget.setWidget(self.groupbox)
         # self.dockwidget.setFloating(True)
         # self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.dockwidget)
+
+        self.bottomdock = QtWidgets.QDockWidget(self)
+        self.console = MessageConsole()
+        self.bottomdock.setWidget(self.console)
+
 
         self.imageplotwidget = pg.PlotWidget()
         self.imageplotwidget.setTitle("LEEM Real Space Image")
