@@ -54,6 +54,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setCentralWidget(self.lv)
         self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.lv.dockwidget)
         self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, self.lv.bottomdock)
+        # self.showMaximized()
 
 
 class MessageConsole(QtWidgets.QWidget):
@@ -97,33 +98,21 @@ class LiveViewer(QtWidgets.QWidget):
     def __init__(self, parent=None):
         super(QtWidgets.QWidget, self).__init__()
 
-        self.layout = QtWidgets.QHBoxLayout()
+        self.layout = QtWidgets.QVBoxLayout()
         self.labelStyle = {'color': '#FFFFFF',
                            'font-size': '16pt'}
+        # Setup Control Buttons and Message Console
+        self.setupDockableWidgets()
 
-        self.dockwidget = QtWidgets.QDockWidget(self)
-        self.groupbox = QtWidgets.QGroupBox()
-        self.buttonboxlayout = QtWidgets.QVBoxLayout()
-        self.loadexperimentbutton = QtWidgets.QPushButton("Load Experiment")
-        self.loadexperimentbutton.clicked.connect(self.load_experiment)
-        self.quitbutton = QtWidgets.QPushButton("Quit")
-        self.quitbutton.clicked.connect(self.quit)
-        self.buttonboxlayout.addWidget(self.loadexperimentbutton)
-        self.buttonboxlayout.addStretch()
-        self.buttonboxlayout.addWidget(self.quitbutton)
-        self.groupbox.setLayout(self.buttonboxlayout)
-        self.dockwidget.setWidget(self.groupbox)
-        # self.dockwidget.setFloating(True)
-        # self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.dockwidget)
-
-        self.bottomdock = QtWidgets.QDockWidget(self)
-        self.console = MessageConsole()
-        self.bottomdock.setWidget(self.console)
-
+        # Setup Plot Widgets
+        self.tabs = QtWidgets.QTabWidget()
+        self.LEEMTab = QtWidgets.QWidget()
+        self.LEEMTabLayout = QtGui.QHBoxLayout()
         self.imageplotwidget = pg.PlotWidget()
         self.imageplotwidget.setTitle("LEEM Real Space Image",
-                                      **self.labelStyle)
-        self.layout.addWidget(self.imageplotwidget)
+                                      size='18pt', color='#FFFFFF')
+
+        self.LEEMTabLayout.addWidget(self.imageplotwidget)
 
         self.ivplotwidget = pg.PlotWidget(parent=self)
         self.ivplotwidget.setLabel('bottom',
@@ -132,14 +121,17 @@ class LiveViewer(QtWidgets.QWidget):
         self.ivplotwidget.setLabel('left',
                                    'Intensity', units='arb units',
                                    **self.labelStyle)
-        self.layout.addWidget(self.ivplotwidget)
 
+        self.LEEMTabLayout.addWidget(self.ivplotwidget)
+        self.LEEMTab.setLayout(self.LEEMTabLayout)
+
+        self.tabs.addTab(self.LEEMTab, "LEEM-I(V)")
+        self.layout.addWidget(self.tabs)
         self.setLayout(self.layout)
 
         self.exp = None
         self.hasdisplayeddata = False
         self.setupData()
-        # self.load_experiment()
         self.setupEventHooks()
         self.show()
 
@@ -155,6 +147,28 @@ class LiveViewer(QtWidgets.QWidget):
         self.posMask = np.zeros((600, 592))
         self.image = pg.ImageItem(self.dat3d[:, :, 0])
         self.imageplotwidget.addItem(self.image)
+
+    def setupDockableWidgets(self):
+        """Various Widgets which can be moved as needed."""
+        # Leftside button widgets
+        self.dockwidget = QtWidgets.QDockWidget(self)
+        self.groupbox = QtWidgets.QGroupBox()
+        self.buttonboxlayout = QtWidgets.QVBoxLayout()
+        self.loadexperimentbutton = QtWidgets.QPushButton("Load Experiment")
+        self.loadexperimentbutton.clicked.connect(self.load_experiment)
+        self.quitbutton = QtWidgets.QPushButton("Quit")
+        self.quitbutton.clicked.connect(self.quit)
+        self.buttonboxlayout.addWidget(self.loadexperimentbutton)
+        self.buttonboxlayout.addStretch()
+        self.buttonboxlayout.addWidget(self.quitbutton)
+        self.groupbox.setLayout(self.buttonboxlayout)
+        self.dockwidget.setWidget(self.groupbox)
+
+        # bottom message console
+        self.bottomdock = QtWidgets.QDockWidget(self)
+        self.console = MessageConsole()
+        self.bottomdock.setWidget(self.console)
+
 
     def setupEventHooks(self):
         """ Setup hooks for mouse clicks and mouse movement;
@@ -430,7 +444,7 @@ def main():
     sys.excepthook = custom_exception_handler
     app = QtWidgets.QApplication(sys.argv)
     mw = MainWindow()
-    mw.show()
+    mw.showMaximized()
     sys.exit(app.exec_())
 
 
