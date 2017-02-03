@@ -161,6 +161,7 @@ class Viewer(QtWidgets.QWidget):
         self.leeddat = LeedData()
         self.exp = None  # overwritten on load with Experiment object
         self.hasdisplayedLEEMdata = False
+        self.hasdisplayedLEEDdata = False
         self.curLEEMIndex = 0
         self.curLEEDIndex = 0
         dummydata = np.zeros((10, 10))
@@ -316,6 +317,54 @@ class Viewer(QtWidgets.QWidget):
                 print('Check file extensions: \'.tif\' and \'.png\'.')
                 return
 
+    def load_LEED_experiment(self):
+        """Load LEED data from settings described by YAML config file."""
+        if self.exp is None:
+            return
+        if self.hasdisplayedLEEDdata:
+            self.LEEDimageplotwidget.getPlotItem().clear()
+            self.LEEDivplotwidget.getPlotItem().clear()
+        if self.exp.data_type.lower() == 'raw':
+            try:
+                self.thread = WorkerThread(task='LOAD_LEED',
+                                           path=self.leeddat.data_dir,
+                                           imht=self.leeddat.ht,
+                                           imwd=self.leeddat.wd,
+                                           bits=self.exp.bit,
+                                           byte=self.exp.byte_order)
+                try:
+                    self.thread.disconnect()
+                except TypeError:
+                    # no signal connections - this is OK
+                    pass
+                self.thread.connectOutputSignal(self.retrieve_LEED_data)
+                self.thread.finished.connect(self.update_LEED_img_after_load)
+                self.thread.start()
+            except ValueError:
+                print('Error Loading LEED Data: Please Recheck YAML Settings')
+                return
+
+        elif self.exp.data_type.lower() == 'image':
+            try:
+                self.thread = WorkerThread(task='LOAD_LEED_IMAGES',
+                                           ext=self.exp.ext,
+                                           path=self.exp.path,
+                                           byte=self.exp.byte_order)
+                try:
+                    self.thread.disconnect()
+                except TypeError:
+                    # no signals were connected - this is OK
+                    pass
+                self.thread.connectOutputSignal(self.retrieve_LEED_data)
+                self.thread.finished.connect(self.update_LEED_img_after_load)
+                self.thread.start()
+            except ValueError:
+                print('Error Loading LEED Experiment from image files.')
+                print('Please Check YAML settings in experiment config file')
+                print('Required parameters: data path and data extension.')
+                print('Valid data extenstions: \'.tif\', \'.png\', \'.jpg\'')
+                return
+
     @QtCore.pyqtSlot(np.ndarray)
     def retrieve_LEEM_data(self, data):
         """Grab the 3d numpy array emitted from the data loading I/O thread."""
@@ -329,7 +378,10 @@ class Viewer(QtWidgets.QWidget):
     @QtCore.pyqtSlot(np.ndarray)
     def retrieve_LEED_data(self, data):
         """Grab the numpy array emitted from the data loading I/O thread."""
-        pass
+        self.leeddat.dat3d = data
+        self.leeddat.dat3ds = data.copy()
+        self.leeddat.posMask = np.zeros((self.leeddat.dat3d.shape[0],
+                                         self.leeddat.dat3d.shape[1]))
 
     @QtCore.pyqtSlot()
     def update_LEEM_img_after_load(self):
@@ -364,6 +416,29 @@ class Viewer(QtWidgets.QWidget):
         self.LEEMimageplotwidget.setTitle(title.format(energy),
                                           **self.labelStyle)
         self.LEEMimageplotwidget.setFocus()
+
+    @QtCore.pyqtSlot()
+    def update_LEED_img_after_load(self):
+        """Called upon data loading I/O thread emitting finished signal."""
+        if self.hasdisplayedLEEDdata:
+            self.LEEDimageplotwidget.getPlotItem().clear()
+        self.curLEEDIndex = self.leeddat.dat3d.shape[2]//2
+        self.LEEDimage = pg.ImageItem(self.leeddat.dat3d[:,
+                                                         :,
+                                                         self.curLEEDIndex].T)
+        self.LEEDimageplotwidget.addItem(self.LEEDimage)
+        self.LEEDimageplotwidget.hideAxis('bottom')
+        self.LEEDimageplotwidget.hideAxis('left')
+        self.leeddat.elist = [self.exp.mine]
+        while len(self.leeddat.elist) < self.leeddat.dat3d.shape[2]:
+            newEnergy = self.leeddat.elist[-1] + self.exp.stepe
+            self.elist.append(round(newEnergy, 2))
+        self.hasdisplayedLEEDdata = True
+        title = "Reciprocal Space LEED Image: {} eV"
+        energy = LF.filenumber_to_energy(self.leeddat.elist, self.curLEEDIndex)
+        self.LEEDimageplotwidget.setTitle(title.format(energy),
+                                          **self.labelStyle)
+        self.LEEDimageplotwidget.setFocus()
 
     def checkDataSize(self, datatype=None):
         """Ensure helper array sizes all match main data array size."""
