@@ -26,7 +26,7 @@ class CustomStream(QtCore.QObject):
 
     message = QtCore.pyqtSignal(str)
 
-    def __init(self):
+    def __init__(self):
         super(QtCore.QObject, self).__init__()
 
     def write(self, message):
@@ -54,6 +54,7 @@ class MainWindow(QtWidgets.QMainWindow):
     """
 
     def __init__(self, v=None):
+        """Parameter v tracks the current PLEASE version number."""
         super(QtWidgets.QMainWindow, self).__init__()
         self.setWindowTitle("PLEASE v. {}".format(v))
         self.viewer = Viewer()
@@ -134,17 +135,8 @@ class Viewer(QtWidgets.QWidget):
 
     def __init__(self, parent=None):
         super(QtWidgets.QWidget, self).__init__()
-
-        self.leemdat = LeemData()
-        self.leeddat = LeedData()
-        self.exp = None  # overwritten on load with Experiment object
-        self.hasdisplayedLEEMdata = False
-        self.curLEEMIndex = 0
-        self.curLEEDIndex = 0
-
+        self.initData()
         self.layout = QtWidgets.QVBoxLayout()
-        self.labelStyle = {'color': '#FFFFFF',
-                           'font-size': '16pt'}
 
         self.tabs = QtWidgets.QTabWidget()
         self.LEEMTab = QtWidgets.QWidget()
@@ -152,11 +144,30 @@ class Viewer(QtWidgets.QWidget):
         self.initLEEMTab()
         self.initLEEDTab()
         self.tabs.addTab(self.LEEMTab, "LEEM-I(V)")
+        self.initLEEMEventHooks()
         self.tabs.addTab(self.LEEDTab, "LEED-I(V)")
 
         self.layout.addWidget(self.tabs)
         self.setLayout(self.layout)
         self.show()
+
+    def initData(self):
+        """Specific initialization.
+
+        Certain attributes require initialization so that their signals
+        can be accessed.
+        """
+        self.leemdat = LeemData()
+        self.leeddat = LeedData()
+        self.exp = None  # overwritten on load with Experiment object
+        self.hasdisplayedLEEMdata = False
+        self.curLEEMIndex = 0
+        self.curLEEDIndex = 0
+        dummydata = np.zeros((10, 10))
+        self.LEEMimage = pg.ImageItem(dummydata)  # required for signal hook
+        self.LEEDimage = pg.ImageItem(dummydata)  # required for signal hook
+        self.labelStyle = {'color': '#FFFFFF',
+                           'font-size': '16pt'}
 
     def initLEEMTab(self):
         """Setup Layout of LEEM Tab."""
@@ -173,6 +184,7 @@ class Viewer(QtWidgets.QWidget):
                                        'Intensity', units='arb units',
                                        **self.labelStyle)
 
+        self.LEEMimageplotwidget.addItem(self.LEEMimage)
         self.LEEMTabLayout.addWidget(self.LEEMivplotwidget)
         self.LEEMTab.setLayout(self.LEEMTabLayout)
 
@@ -190,6 +202,22 @@ class Viewer(QtWidgets.QWidget):
         self.LEEDivplotwidget.setLabel('left',
                                        'Intensity', units='arb units',
                                        **self.labelStyle)
+        self.LEEDimageplotwidget.addItem(self.LEEDimage)
+        self.LEEDTabLayout.addWidget(self.LEEDivplotwidget)
+        self.LEEDTab.setLayout(self.LEEDTabLayout)
+
+    def initLEEMEventHooks(self):
+        """Setup event hooks for mouse click and mouse move.
+
+        Signals beginning with 'sig' are defined by pyqtgraph
+        as opposed to being defined in Qt.
+        """
+        # signals
+        sigmc = self.LEEMimage.scene().sigMouseClicked
+        sigmmv = self.LEEMimage.scene().sigMouseMoved
+
+        sigmc.connect(self.handleLEEMClick)
+        sigmmv.connect(self.handleLEEMMouseMoved)
 
     def load_experiment(self):
         """Query User for YAML config file to load experiment settings.
@@ -351,6 +379,80 @@ class Viewer(QtWidgets.QWidget):
             pass
         else:
             return
+
+    def handleLEEMClick(self, event):
+        """User click in image area."""
+        if not self.hasdisplayedLEEMdata:
+            return
+
+        # clicking outside image area may cause event.currentItem
+        # to be None. This would then raise an error when trying to
+        # call event.pos()
+        if event.currentItem is None:
+            return
+
+        pos = event.pos()
+        mappedPos = self.LEEMimage.mapFromScene(pos)
+        xmp = int(mappedPos.x())
+        ymp = int(mappedPos.y())
+
+        if xmp < 0 or \
+           xmp > self.leemdat.dat3d.shape[1] or \
+           ymp < 0 or \
+           ymp > self.leemdat.dat3d.shape[0]:
+            return  # discard click events originating outside the image
+        try:
+            pw = pg.plot(self.leemdat.elist,
+                         self.leemdat.dat3d[ymp, xmp, :],
+                         title='LEEM-I(V)')
+        except IndexError:
+            return
+        pw.setLabel('bottom', 'Energy', units='eV', **self.labelStyle)
+        pw.setLabel('left', 'Intensity', units='a.u.', **self.labelStyle)
+        pw.show()
+
+    def handleLEEMMouseMoved(self, pos):
+        """Track mouse movement within LEEM image area."""
+        if not self.hasdisplayedLEEMdata:
+            return
+        if isinstance(pos, tuple):
+            try:
+                # if pos a tuple containing a QPointF object
+                pos = pos[0]
+            except IndexError:
+                # empty tuple
+                return
+        # else pos is a QPointF object which can be mapped directly
+
+        mappedPos = self.LEEMimage.mapFromScene(pos)
+        xmp = int(mappedPos.x())
+        ymp = int(mappedPos.y())
+        if xmp < 0 or \
+           xmp > self.leemdat.dat3d.shape[1] - 1 or \
+           ymp < 0 or \
+           ymp > self.leemdat.dat3d.shape[0] - 1:
+            return  # discard  movement events originating outside the image
+
+        # update crosshair
+        # self.ch.setPos(xmp, ymp)
+        self.crosshair.curPos = (xmp, ymp)
+        self.crosshair.vline.setPos(xmp)
+        self.crosshair.hline.setPos(ymp)
+
+        # update IV plot
+        xdata = self.leemdat.elist
+
+        if self.leemdat.posMask[ymp, xmp]:
+            ydata = self.leemdat.dat3ds[ymp, xmp, :]
+        else:
+            ydata = LF.smooth(self.leemdat.dat3d[ymp, xmp, :],
+                              window_len=10,
+                              window_type='flat')
+            self.leemdat.dat3ds[ymp, xmp, :] = ydata
+            self.leemdat.posMask[ymp, xmp] = 1
+        pdi = pg.PlotDataItem(xdata, ydata, pen='r')
+        self.LEEMivplotwidget.getPlotItem().clear()
+        self.LEEMivplotwidget.getPlotItem().addItem(pdi, clear=True)
 
     def showLEEMImage(self, idx):
         """Display image from main data array at index=idx."""
