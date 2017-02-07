@@ -279,6 +279,7 @@ class Viewer(QtWidgets.QWidget):
             return
         if self.exp.data_type.lower() == 'raw':
             try:
+                # use settings from self.sexp
                 self.thread = WorkerThread(task='LOAD_LEEM',
                                            path=str(self.exp.path),
                                            imht=self.exp.imh,
@@ -326,6 +327,7 @@ class Viewer(QtWidgets.QWidget):
             self.LEEDivplotwidget.getPlotItem().clear()
         if self.exp.data_type.lower() == 'raw':
             try:
+                # use settings from self.exp
                 self.thread = WorkerThread(task='LOAD_LEED',
                                            path=str(self.exp.path),
                                            imht=self.exp.imh,
