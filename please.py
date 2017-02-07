@@ -531,6 +531,27 @@ class Viewer(QtWidgets.QWidget):
         self.LEEMivplotwidget.getPlotItem().clear()
         self.LEEMivplotwidget.getPlotItem().addItem(pdi, clear=True)
 
+    def keyPressEvent(self, event):
+        """Set Arrow keys for navigation."""
+        if self.tabs.currentIndex() == 0 and \
+           self.hasdisplayedLEEMdata:
+            # handle LEEM navigation
+            maxIdx = self.leemdat.dat3d.shape[2] - 1
+            minIdx = 0
+            if (event.key() == QtCore.Qt.Key_Left) and \
+               (self.currentLEEMIndex >= minIdx + 1):
+                self.currentLEEMIndex -= 1
+                self.showLEEMImage(self.currentLEEMIndex)
+            elif (event.key() == QtCore.Qt.Key_Right) and \
+             (self.currentLEEMIndex <= maxIdx - 1):
+                self.currentLEEMIndex += 1
+                self.showLEEMImage(self.currentLEEMIndex)
+        elif self.tabs.currentIndex() == 1 and \
+             self.hasdisplayedLEEDdata:
+            # handle LEED navigation
+            pass
+
+
     def showLEEMImage(self, idx):
         """Display image from main data array at index=idx."""
         if idx not in range(self.leemdat.dat3d.shape[2] - 1):
