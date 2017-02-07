@@ -327,7 +327,7 @@ class Viewer(QtWidgets.QWidget):
         if self.exp.data_type.lower() == 'raw':
             try:
                 self.thread = WorkerThread(task='LOAD_LEED',
-                                           path=self.leeddat.data_dir,
+                                           path=str(self.exp.path),
                                            imht=self.leeddat.ht,
                                            imwd=self.leeddat.wd,
                                            bits=self.exp.bit,
