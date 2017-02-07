@@ -533,30 +533,58 @@ class Viewer(QtWidgets.QWidget):
 
     def keyPressEvent(self, event):
         """Set Arrow keys for navigation."""
+
+        # LEEM Tab is active
         if self.tabs.currentIndex() == 0 and \
            self.hasdisplayedLEEMdata:
             # handle LEEM navigation
             maxIdx = self.leemdat.dat3d.shape[2] - 1
             minIdx = 0
             if (event.key() == QtCore.Qt.Key_Left) and \
-               (self.currentLEEMIndex >= minIdx + 1):
-                self.currentLEEMIndex -= 1
-                self.showLEEMImage(self.currentLEEMIndex)
+               (self.curLEEMIndex >= minIdx + 1):
+                self.curLEEMIndex -= 1
+                self.showLEEMImage(self.curLEEMIndex)
+                title = "Real Space LEEM Image: {} eV"
+                energy = LF.filenumber_to_energy(self.leemdat.elist,
+                                                 self.curLEEMIndex)
+                self.LEEMimageplotwidget.setTitle(title.format(energy))
             elif (event.key() == QtCore.Qt.Key_Right) and \
-             (self.currentLEEMIndex <= maxIdx - 1):
-                self.currentLEEMIndex += 1
-                self.showLEEMImage(self.currentLEEMIndex)
+                 (self.curLEEMIndex <= maxIdx - 1):
+                self.curLEEMIndex += 1
+                self.showLEEMImage(self.curLEEMIndex)
+                title = "Real Space LEEM Image: {} eV"
+                energy = LF.filenumber_to_energy(self.leemdat.elist,
+                                                 self.curLEEMIndex)
+                self.LEEMimageplotwidget.setTitle(title.format(energy))
+        # LEED Tab is active
         elif self.tabs.currentIndex() == 1 and \
              self.hasdisplayedLEEDdata:
             # handle LEED navigation
-            pass
+            maxIdx = self.leeddat.dat3d.shape[2] - 1
+            minIdx = 0
+            if (event.key() == QtCore.Qt.Key_Left) and \
+               (self.curLEEDIndex >= minIdx + 1):
+                self.curLEEDIndex -= 1
+                self.showLEEDImage(self.curLEEDIndex)
+            elif (event.key() == QtCore.Qt.Key_Right) and \
+             (self.curLEEDIndex <= maxIdx - 1):
+                self.curLEEDIndex += 1
+                self.showLEEDImage(self.curLEEDIndex)
+
 
 
     def showLEEMImage(self, idx):
-        """Display image from main data array at index=idx."""
+        """Display LEEM image from main data array at index=idx."""
         if idx not in range(self.leemdat.dat3d.shape[2] - 1):
             return
         self.LEEMimage.setImage(self.leemdat.dat3d[:, :, idx].T)
+
+    def showLEEDImage(self, idx):
+        """Display LEED image from main data array at index=idx."""
+        if idx not in range(self.leeddat.dat3d.shape[2] - 1):
+            return
+        self.LEEDimage.setImage(self.leeddat.dat3d[:, :, idx].T)
+
 
 
 def custom_exception_handler(exc_type, exc_value, exc_traceback):
