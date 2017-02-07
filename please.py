@@ -19,6 +19,7 @@ from qthreads import WorkerThread
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 __Version = '1.0.0'
+__imgorder = 'row-major'  # pyqtgraph global setting
 
 
 class CustomStream(QtCore.QObject):
@@ -426,8 +427,8 @@ class Viewer(QtWidgets.QWidget):
             self.LEEDimageplotwidget.getPlotItem().clear()
         self.curLEEDIndex = self.leeddat.dat3d.shape[2]//2
         self.LEEDimage = pg.ImageItem(self.leeddat.dat3d[:,
-                                                         :,
-                                                         self.curLEEDIndex].T)
+                                                         ::-1,
+                                                         self.curLEEDIndex])
         self.LEEDimageplotwidget.addItem(self.LEEDimage)
         self.LEEDimageplotwidget.hideAxis('bottom')
         self.LEEDimageplotwidget.hideAxis('left')
@@ -566,11 +567,18 @@ class Viewer(QtWidgets.QWidget):
                (self.curLEEDIndex >= minIdx + 1):
                 self.curLEEDIndex -= 1
                 self.showLEEDImage(self.curLEEDIndex)
+                title = "Real Space LEED Image: {} eV"
+                energy = LF.filenumber_to_energy(self.leeddat.elist,
+                                                 self.curLEEDIndex)
+                self.LEEDimageplotwidget.setTitle(title.format(energy))
             elif (event.key() == QtCore.Qt.Key_Right) and \
              (self.curLEEDIndex <= maxIdx - 1):
                 self.curLEEDIndex += 1
                 self.showLEEDImage(self.curLEEDIndex)
-
+                title = "Real Space LEED Image: {} eV"
+                energy = LF.filenumber_to_energy(self.leeddat.elist,
+                                                 self.curLEEDIndex)
+                self.LEEDimageplotwidget.setTitle(title.format(energy))
 
 
     def showLEEMImage(self, idx):
@@ -583,7 +591,7 @@ class Viewer(QtWidgets.QWidget):
         """Display LEED image from main data array at index=idx."""
         if idx not in range(self.leeddat.dat3d.shape[2] - 1):
             return
-        self.LEEDimage.setImage(self.leeddat.dat3d[:, :, idx].T)
+        self.LEEDimage.setImage(self.leeddat.dat3d[:, ::-1, idx])
 
 
 
@@ -602,6 +610,10 @@ def main():
     sys.excepthook = custom_exception_handler
     # print("Initializing Qt Event Loop ...")
     app = QtWidgets.QApplication(sys.argv)
+
+    # pyqtgraph settings
+    # pg.setConfigOption('imageAxisOrder', __imgorder)
+
     # print("Creating Please App ...")
     mw = MainWindow(v=__Version)
     mw.showMaximized()
