@@ -328,8 +328,8 @@ class Viewer(QtWidgets.QWidget):
             try:
                 self.thread = WorkerThread(task='LOAD_LEED',
                                            path=str(self.exp.path),
-                                           imht=self.leeddat.ht,
-                                           imwd=self.leeddat.wd,
+                                           imht=self.exp.imh,
+                                           imwd=self.exp.imw,
                                            bits=self.exp.bit,
                                            byte=self.exp.byte_order)
                 try:
@@ -432,7 +432,7 @@ class Viewer(QtWidgets.QWidget):
         self.leeddat.elist = [self.exp.mine]
         while len(self.leeddat.elist) < self.leeddat.dat3d.shape[2]:
             newEnergy = self.leeddat.elist[-1] + self.exp.stepe
-            self.elist.append(round(newEnergy, 2))
+            self.leeddat.elist.append(round(newEnergy, 2))
         self.hasdisplayedLEEDdata = True
         title = "Reciprocal Space LEED Image: {} eV"
         energy = LF.filenumber_to_energy(self.leeddat.elist, self.curLEEDIndex)
