@@ -28,6 +28,7 @@ class CustomStream(QtCore.QObject):
     message = QtCore.pyqtSignal(str)
 
     def __init__(self):
+        """Just initialize super class, no instance variables needed."""
         super(QtCore.QObject, self).__init__()
 
     def write(self, message):
@@ -50,8 +51,10 @@ class ExtendedCrossHair(QtCore.QObject):
 
 
 class MainWindow(QtWidgets.QMainWindow):
-    """Top level conatiner to wrap LiveViewer object.
+    """Top level conatiner to wrap Viewer object.
+
     Provides dockable interface.
+    Provides Menubar - to be implemented later
     """
 
     def __init__(self, v=None):
@@ -91,12 +94,18 @@ class MainWindow(QtWidgets.QMainWindow):
 
 
 class MessageConsole(QtWidgets.QWidget):
-    """QTextArea to collect messages rerouted from sys.stdout.
+    """TextArea to collect messages rerouted from sys.stdout.
+
     Will be contained in a DockWidget dockable to the bottom
-    of the main window.
+    of the QMainWindow.
     """
 
     def __init__(self):
+        """Initialize TextEdit and CustomStream.
+
+        Reroute sys.stdout and sys.stderr to print to QTextEdit
+        Disable user edits on QTextEdit (ReadOnly)
+        """
         super(QtWidgets.QWidget, self).__init__()
 
         layout = QtWidgets.QVBoxLayout()
@@ -127,6 +136,7 @@ class MessageConsole(QtWidgets.QWidget):
 
     @staticmethod
     def welcome():
+        """Called on instantiation of MessageConsole."""
         print("Welcome to PLEASE!")
         print("Use the button bar to the left to load data for analysis.")
 
@@ -135,6 +145,11 @@ class Viewer(QtWidgets.QWidget):
     """Main Container for Viewing LEEM and LEED data."""
 
     def __init__(self, parent=None):
+        """Initialize main LEEM and LEED data stucts.
+
+        Setup Tab structure
+        Connect key/mouse event hooks to image plot widgets
+        """
         super(QtWidgets.QWidget, self).__init__()
         self.initData()
         self.layout = QtWidgets.QVBoxLayout()
@@ -225,7 +240,6 @@ class Viewer(QtWidgets.QWidget):
         """Query User for YAML config file to load experiment settings.
         Adapted from my other project https://www.github.com/mgrady3/pLEASE
         """
-
         yamlFilter = "YAML (*.yaml);;YML (*.yml);;All Files (*)"
         homeDir = os.getenv("HOME")
         caption = "Select YAML Experiment Config File"
@@ -534,7 +548,6 @@ class Viewer(QtWidgets.QWidget):
 
     def keyPressEvent(self, event):
         """Set Arrow keys for navigation."""
-
         # LEEM Tab is active
         if self.tabs.currentIndex() == 0 and \
            self.hasdisplayedLEEMdata:
@@ -558,8 +571,8 @@ class Viewer(QtWidgets.QWidget):
                                                  self.curLEEMIndex)
                 self.LEEMimageplotwidget.setTitle(title.format(energy))
         # LEED Tab is active
-        elif self.tabs.currentIndex() == 1 and \
-             self.hasdisplayedLEEDdata:
+        elif (self.tabs.currentIndex() == 1) and \
+             (self.hasdisplayedLEEDdata):
             # handle LEED navigation
             maxIdx = self.leeddat.dat3d.shape[2] - 1
             minIdx = 0
@@ -572,14 +585,13 @@ class Viewer(QtWidgets.QWidget):
                                                  self.curLEEDIndex)
                 self.LEEDimageplotwidget.setTitle(title.format(energy))
             elif (event.key() == QtCore.Qt.Key_Right) and \
-             (self.curLEEDIndex <= maxIdx - 1):
+                 (self.curLEEDIndex <= maxIdx - 1):
                 self.curLEEDIndex += 1
                 self.showLEEDImage(self.curLEEDIndex)
                 title = "Real Space LEED Image: {} eV"
                 energy = LF.filenumber_to_energy(self.leeddat.elist,
                                                  self.curLEEDIndex)
                 self.LEEDimageplotwidget.setTitle(title.format(energy))
-
 
     def showLEEMImage(self, idx):
         """Display LEEM image from main data array at index=idx."""
@@ -592,7 +604,6 @@ class Viewer(QtWidgets.QWidget):
         if idx not in range(self.leeddat.dat3d.shape[2] - 1):
             return
         self.LEEDimage.setImage(self.leeddat.dat3d[:, ::-1, idx])
-
 
 
 def custom_exception_handler(exc_type, exc_value, exc_traceback):

@@ -65,6 +65,7 @@ def process_LEEM_Data(dirname, ht=0, wd=0, bits=None, byte='L'):
     arr_list = []
     flag = True
     # add filter on file names to exclude hidden files beginning with a leading period
+    print("Searching for files in {}".format(dirname))
     files = [name for name in os.listdir(dirname) if name.endswith('.dat') and not name.startswith(".")]
     files.sort()
     print('First file is {}.'.format(files[0]))
@@ -76,7 +77,8 @@ def process_LEEM_Data(dirname, ht=0, wd=0, bits=None, byte='L'):
                 hdln = DEF_IMHEAD
                 ht = DEF_IMHEIGHT
                 wd = DEF_IMWIDTH
-            else: hdln = len(f.read()) - (int(bits/8)*ht*wd)  # multiply by number of bytes per pixel
+            else:
+                hdln = len(f.read()) - (int(bits/8)*ht*wd)  # multiply by number of bytes per pixel
 
             if flag:
                 print('Calculated Header Length of First File: {}'.format(hdln))
