@@ -185,6 +185,7 @@ class Viewer(QtWidgets.QWidget):
         self.LEEDimage = pg.ImageItem(dummydata)  # required for signal hook
         self.labelStyle = {'color': '#FFFFFF',
                            'font-size': '16pt'}
+        self.boxrad = 20
 
     def initLEEMTab(self):
         """Setup Layout of LEEM Tab."""
@@ -229,12 +230,19 @@ class Viewer(QtWidgets.QWidget):
         Signals beginning with 'sig' are defined by pyqtgraph
         as opposed to being defined in Qt.
         """
+        # LEEM #
         # signals
-        sigmc = self.LEEMimage.scene().sigMouseClicked
-        sigmmv = self.LEEMimage.scene().sigMouseMoved
+        sigmcLEEM = self.LEEMimage.scene().sigMouseClicked
+        sigmmvLEEM = self.LEEMimage.scene().sigMouseMoved
 
-        sigmc.connect(self.handleLEEMClick)
-        sigmmv.connect(self.handleLEEMMouseMoved)
+        sigmcLEEM.connect(self.handleLEEMClick)
+        sigmmvLEEM.connect(self.handleLEEMMouseMoved)
+
+        # LEED #
+        # signals
+        sigmcLEED = self.LEEDimage.scene().sigMouseClicked
+
+        sigmcLEED.connect(self.handleLEEDClick)
 
     def load_experiment(self):
         """Query User for YAML config file to load experiment settings.
@@ -292,6 +300,7 @@ class Viewer(QtWidgets.QWidget):
         """Load LEEM data from settings described by YAML config file."""
         if self.exp is None:
             return
+        self.tabs.setCurrentWidget(self.LEEMTab)
         if self.exp.data_type.lower() == 'raw':
             try:
                 # use settings from self.sexp
@@ -337,6 +346,7 @@ class Viewer(QtWidgets.QWidget):
         """Load LEED data from settings described by YAML config file."""
         if self.exp is None:
             return
+        self.tabs.setCurrentWidget(self.LEEDTab)
         if self.hasdisplayedLEEDdata:
             self.LEEDimageplotwidget.getPlotItem().clear()
             self.LEEDivplotwidget.getPlotItem().clear()
@@ -546,6 +556,38 @@ class Viewer(QtWidgets.QWidget):
         self.LEEMivplotwidget.getPlotItem().clear()
         self.LEEMivplotwidget.getPlotItem().addItem(pdi, clear=True)
 
+    def handleLEEDClick(self, event):
+        """Draw Rect ROI and extract I(V)."""
+        if not self.hasdisplayedLEEDdata:
+            return
+        pos = event.pos()
+        print("Mouse click position: {}".format(pos))
+        mappedPos = self.LEEDimage.mapFromScene(pos)
+        xmp = int(mappedPos.x())
+        ymp = int(mappedPos.y())
+        print("Mapped position: {}".format((xmp, ymp)))
+
+        if xmp < 0 or \
+           xmp > self.leeddat.dat3d.shape[1] or \
+           ymp < 0 or \
+           ymp > self.leeddat.dat3d.shape[0]:
+            return  # discard click events originating outside the image
+
+        if (xmp - self.boxrad < 0) or \
+           (xmp + self.boxrad > self.leeddat.dat3d.shape[0]) or \
+           (ymp - self.boxrad < 0) or \
+           (ymp + self.boxrad > self.leeddat.dat3d.shape[1]):
+            print("Too close to image edge")
+            return  # discard clicks where integration window would hit edge
+
+        # ROI pos is specified as lower elft corner in (x, y) format
+        ll = (xmp - self.boxrad, ymp + self.boxrad)
+        print("Rect ROI position: {}".format(ll))
+        rect = pg.RectROI(pos=(pos.x(), pos.y()),
+                          size=(2*self.boxrad, 2*self.boxrad))
+        rect.setPen(color='r', width=3)
+        self.LEEDimageplotwidget.addItem(rect)
+
     def keyPressEvent(self, event):
         """Set Arrow keys for navigation."""
         # LEEM Tab is active
@@ -617,6 +659,7 @@ def custom_exception_handler(exc_type, exc_value, exc_traceback):
 
 
 def main():
+    """Start Qt Event Loop and display main window."""
     # print("Welcome to PLEASE. Installing Custom Exception Handler ...")
     sys.excepthook = custom_exception_handler
     # print("Initializing Qt Event Loop ...")
