@@ -580,6 +580,8 @@ class Viewer(QtWidgets.QWidget):
             print("Too close to image edge")
             return  # discard clicks where integration window would hit edge
 
+        # ROI position mapping is not working correctly
+        """
         # ROI pos is specified as lower elft corner in (x, y) format
         ll = (xmp - self.boxrad, ymp + self.boxrad)
         print("Rect ROI position: {}".format(ll))
@@ -587,6 +589,15 @@ class Viewer(QtWidgets.QWidget):
                           size=(2*self.boxrad, 2*self.boxrad))
         rect.setPen(color='r', width=3)
         self.LEEDimageplotwidget.addItem(rect)
+        """
+        ctr = (ymp, xmp)  # r, c format
+        intwindow = self.leeddat.dat3d[ctr[0]-self.boxrad:ctr[0]+self.boxrad+1,
+                                       ctr[1]-self.boxrad:ctr[1]+self.boxrad+1,
+                                       :]
+        ilist = [img.sum() for img in np.rollaxis(intwindow, 2)]
+        self.LEEDivplotwidget.plot(self.leeddat.elist,
+                                   ilist,
+                                   pen='r')
 
     def keyPressEvent(self, event):
         """Set Arrow keys for navigation."""
