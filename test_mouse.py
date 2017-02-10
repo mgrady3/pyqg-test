@@ -30,7 +30,7 @@ class Window(QtWidgets.QWidget):
         topleft = QtCore.QPointF(pos.x()-w//2, pos.y()-h//2)
         # create a QRectF  (topleft.x, topleft.y, w, h)
         rect = QtCore.QRectF(topleft.x(), topleft.y(), w, h)
-        pen = QtCore.QPen()
+        pen = QtGui.QPen()
         pen.setStyle(QtCore.Qt.SolidLine)
         pen.setWidth(2)
         pen.setBrush(QtCore.Qt.red)
