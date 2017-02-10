@@ -68,7 +68,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, self.bottomdock)
 
     def setupDockableWidgets(self):
-        """Various Widgets which can be Docked to MainWindow."""
+        """Dock control and information widgets to main window."""
         # Leftside button widgets
         self.dockwidget = QtWidgets.QDockWidget(self)
         self.groupbox = QtWidgets.QGroupBox()
@@ -246,6 +246,7 @@ class Viewer(QtWidgets.QWidget):
 
     def load_experiment(self):
         """Query User for YAML config file to load experiment settings.
+
         Adapted from my other project https://www.github.com/mgrady3/pLEASE
         """
         yamlFilter = "YAML (*.yaml);;YML (*.yml);;All Files (*)"
