@@ -563,39 +563,23 @@ class Viewer(QtWidgets.QWidget):
             return
         pos = event.pos()
         print("Mouse click position: {}".format(pos))
-        mappedPos = self.LEEDimage.mapFromScene(pos)
-        xmp = int(mappedPos.x())
-        ymp = int(mappedPos.y())
-        print("Mapped position: {}".format((xmp, ymp)))
 
-        if xmp < 0 or \
-           xmp > self.leeddat.dat3d.shape[1] or \
-           ymp < 0 or \
-           ymp > self.leeddat.dat3d.shape[0]:
-            return  # discard click events originating outside the image
-
-        if (xmp - self.boxrad < 0) or \
-           (xmp + self.boxrad > self.leeddat.dat3d.shape[0]) or \
-           (ymp - self.boxrad < 0) or \
-           (ymp + self.boxrad > self.leeddat.dat3d.shape[1]):
-            print("Too close to image edge")
-            return  # discard clicks where integration window would hit edge
-
-        # ROI position mapping is not working correctly
-        """
-        # ROI pos is specified as lower elft corner in (x, y) format
-        ll = (xmp - self.boxrad, ymp + self.boxrad)
-        print("Rect ROI position: {}".format(ll))
-        rect = pg.RectROI(pos=(pos.x(), pos.y()),
-                          size=(2*self.boxrad, 2*self.boxrad))
-        rect.setPen(color='r', width=3)
-        self.LEEDimageplotwidget.addItem(rect)
-        """
-        ctr = (ymp, xmp)  # r, c format
+        ctr = (int(pos.y()), int(pos.x()))  # r, c format
         intwindow = self.leeddat.dat3d[ctr[0]-self.boxrad:ctr[0]+self.boxrad+1,
                                        ctr[1]-self.boxrad:ctr[1]+self.boxrad+1,
                                        :]
         ilist = [img.sum() for img in np.rollaxis(intwindow, 2)]
+        # topleft corner cooridnates
+        xpos = pos.x() - self.boxrad
+        ypos = pos.y() - self.boxrad
+
+        rect = QtCore.QRectF(xpos, ypos, self.boxrad, self.boxrad)
+        pen = QtGui.QPen()
+        pen.setStyle(QtCore.Qt.SolidLine)
+        pen.setWidth(2)
+        pen.setBrush(QtCore.Qt.red)
+
+        self.LEEDimageplotwidget.scene().addRect(rect, pen=pen)
         self.LEEDivplotwidget.plot(self.leeddat.elist,
                                    ilist,
                                    pen='r')
