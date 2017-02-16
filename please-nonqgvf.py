@@ -1,5 +1,4 @@
 """PLEASE - The Python Low-energy Electron Analysis SuitE.
-
 Author: Maxwell Grady
 Affiliation: University of New Hampshire Department of Physics Pohl group
 Version 1.0.0
@@ -52,7 +51,6 @@ class ExtendedCrossHair(QtCore.QObject):
 
 class MainWindow(QtWidgets.QMainWindow):
     """Top level conatiner to wrap Viewer object.
-
     Provides dockable interface.
     Provides Menubar - to be implemented later
     """
@@ -95,14 +93,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
 class MessageConsole(QtWidgets.QWidget):
     """TextArea to collect messages rerouted from sys.stdout.
-
     Will be contained in a DockWidget dockable to the bottom
     of the QMainWindow.
     """
 
     def __init__(self):
         """Initialize TextEdit and CustomStream.
-
         Reroute sys.stdout and sys.stderr to print to QTextEdit
         Disable user edits on QTextEdit (ReadOnly)
         """
@@ -141,137 +137,11 @@ class MessageConsole(QtWidgets.QWidget):
         print("Use the button bar to the left to load data for analysis.")
 
 
-class ImView(QtWidgets.QGraphicsView):
-    """Container for images using the QGV-Framework."""
-
-    ivEvent = QtCore.pyqtSignal(int, int)
-
-    def __init__(self, parent=None, rad=20):
-        """Setup the QGraphicsView Framework; Analogous to Model-View Framework.
-
-        :QGraphicsView: self - contains the viewport to see image data
-        :QGraphicsScene: self.scene - container for items to be displayed. Scene
-            also handles event routing between view and graphics items.
-        :QImage: - self.image - Wrapper class around numpy array. Image is
-            cast to uint8 for display purposes. Original image data in numpy
-            array remains unchanged to retain accuracy in all calculations.
-        :QGraphicsPixmapItem: - self.graphicspixmapitem - GraphicsItem wrapper
-            for QPixmap generated from the QImage. Added to Scene to be
-            displayed in viewport.
-        """
-        super(QtWidgets.QGraphicsView, self).__init__(parent=parent)
-        self.boxrad = rad  # User configurable
-        self.hasloadeddata = False
-        # initialize View with random data
-        self.originaldata = np.random.randint(0, 65535, size=(600, 600),
-                                              dtype=np.uint16)
-        # Display data is cast to uint8 to create QImage in 8bit grayscale
-        self.displaydata = self.map16to8(self.originaldata)
-        self.scene = QtWidgets.QGraphicsScene(self)
-        self.image = QtGui.QImage(self.displaydata,
-                                  self.displaydata.shape[1],
-                                  self.displaydata.shape[0],
-                                  self.displaydata.strides[0],
-                                  QtGui.QImage.Format_Grayscale8)
-        self.graphicspixmapitem = QtWidgets.QGraphicsPixmapItem(
-                                         QtGui.QPixmap.fromImage(self.image))
-        self.scene.addItem(self.graphicspixmapitem)
-        self.setScene(self.scene)
-        self.graphicspixmapitem.mousePressEvent = self.handleMouseClick
-
-    @staticmethod
-    def map16to8(img, lower=None, upper=None):
-        """Safely map 16-bit img to 8-bit img for display."""
-        if lower is not None and not (0 <= lower < 65535):
-            raise ValueError("Lower bound must be in [0, 65535].")
-        if upper is not None and not(0 <= upper < 2**16):
-            raise ValueError("Upper bound must be in [0, 65535].")
-        if lower is None:
-            lower = np.amin(img)
-        if upper is None:
-            upper = np.amax(img)
-        if lower >= upper:
-            raise ValueError("Lower bound must be < Upper bound.")
-
-        lut = np.concatenate([
-            np.zeros(lower, dtype=np.uint16),
-            np.linspace(0, 255, upper - lower).astype(np.uint16),
-            np.ones(2**16 - upper, dtype=np.uint16) * 255
-            ])
-        return lut[img].astype(np.uint8)
-
-    def setImage(self, img):
-        """Display numpy array via QGraphicsPixmapItem.
-        :param: img - must be a 2D numpy array in 16bit or 8bit format.
-        """
-        if not isinstance(img, np.ndarray):
-            raise ValueError("Image must be a 2d numpy array.")
-        if len(img.shape) > 2:
-            raise ValueError("Image must be a 2d numpy array.")
-        if img.dtype == np.uint16:
-            # Need to convert to an 8bit display version
-            self.originaldata = img
-            self.displaydata = self.map16to8(img)
-        elif img.dtype == np.uint8:
-            self.originaldata = img
-            self.displaydata = img
-        else:
-            raise ValueError("Image must be 16bit or 8bit Grayscale.")
-
-        self.image = QtGui.QImage(self.displaydata,
-                                  self.displaydata.shape[1],
-                                  self.displaydata.shape[0],
-                                  self.displaydata.strides[0],
-                                  QtGui.QImage.Format_Grayscale8)
-        self.graphicspixmapitem = QtWidgets.QGraphicsPixmapItem(
-                                         QtGui.QPixmap.fromImage(self.image))
-        self.scene.addItem(self.graphicspixmapitem)
-        self.fitInView(self.scene.sceneRect(), QtCore.Qt.KeepAspectRatio)
-        self.hasloadeddata = True
-        self.setScene(self.scene)
-        self.graphicspixmapitem.mousePressEvent = self.handleMouseClick
-
-    def handleMouseClick(self, event):
-        """Draw QRect centered on event.pos().
-        Pass postion back to parent to process I(V) curve and display.
-        """
-        if not self.hasloadeddata:
-            return
-        xp = event.pos().x()
-        yp = event.pos().y()
-
-        # filter clicks that are too close to edge
-        if xp - self.boxrad < 0 or \
-           xp + self.boxrad > self.displaydata.shape[1] or \
-           yp - self.boxrad < 0 or \
-           yp + self.boxrad > self.displaydata.shape[0]:
-            print("Too close to Edge.")
-            return
-
-        topleftcorner = QtCore.QPointF(xp - self.boxrad,
-                                       yp - self.boxrad)
-        rect = QtCore.QRectF(topleftcorner.x(), topleftcorner.y(),
-                             2*self.boxrad, 2*self.boxrad)
-        pen = QtGui.QPen()
-        pen.setStyle(QtCore.Qt.SolidLine)
-        pen.setWidth(2)
-        pen.setBrush(QtCore.Qt.red)
-        self.scene.addRect(rect, pen=pen)
-
-        # pass event location to Viewer obect for processing
-        self.ivEvent.emit(int(xp), int(yp))
-
-    def keyPressEvent(self, event):
-        """Navigate LEED images via arrow keys."""
-        self.parent().keyPressEvent(event)
-
-
 class Viewer(QtWidgets.QWidget):
     """Main Container for Viewing LEEM and LEED data."""
 
     def __init__(self, parent=None):
         """Initialize main LEEM and LEED data stucts.
-
         Setup Tab structure
         Connect key/mouse event hooks to image plot widgets
         """
@@ -294,7 +164,6 @@ class Viewer(QtWidgets.QWidget):
 
     def initData(self):
         """Specific initialization.
-
         Certain attributes require initialization so that their signals
         can be accessed.
         """
@@ -307,14 +176,13 @@ class Viewer(QtWidgets.QWidget):
         self.curLEEDIndex = 0
         dummydata = np.zeros((10, 10))
         self.LEEMimage = pg.ImageItem(dummydata)  # required for signal hook
-        # self.LEEDimage = pg.ImageItem(dummydata)  # required for signal hook
+        self.LEEDimage = pg.ImageItem(dummydata)  # required for signal hook
         self.labelStyle = {'color': '#FFFFFF',
                            'font-size': '16pt'}
         self.boxrad = 20
 
     def initLEEMTab(self):
         """Setup Layout of LEEM Tab."""
-
         self.LEEMTabLayout = QtWidgets.QHBoxLayout()
         self.LEEMimageplotwidget = pg.PlotWidget()
         self.LEEMimageplotwidget.setTitle("LEEM Real Space Image",
@@ -335,15 +203,10 @@ class Viewer(QtWidgets.QWidget):
     def initLEEDTab(self):
         """Setup Layout of LEED Tab."""
         self.LEEDTabLayout = QtWidgets.QHBoxLayout()
-        """
         self.LEEDimageplotwidget = pg.PlotWidget()
         self.LEEDimageplotwidget.setTitle("LEED Reciprocal Space Image",
                                           size='18pt', color='#FFFFFF')
         self.LEEDTabLayout.addWidget(self.LEEDimageplotwidget)
-        """
-        self.LEEDimagewidget = ImView(parent=self, rad=self.boxrad)
-        self.LEEDimagewidget.ivEvent.connect(self.processLEEDIV)
-        self.LEEDTabLayout.addWidget(self.LEEDimagewidget)
         self.LEEDivplotwidget = pg.PlotWidget()
         self.LEEDivplotwidget.setLabel('bottom',
                                        'Energy', units='eV',
@@ -351,13 +214,12 @@ class Viewer(QtWidgets.QWidget):
         self.LEEDivplotwidget.setLabel('left',
                                        'Intensity', units='arb units',
                                        **self.labelStyle)
-        # self.LEEDimageplotwidget.addItem(self.LEEDimage)
+        self.LEEDimageplotwidget.addItem(self.LEEDimage)
         self.LEEDTabLayout.addWidget(self.LEEDivplotwidget)
         self.LEEDTab.setLayout(self.LEEDTabLayout)
 
     def initLEEMEventHooks(self):
         """Setup event hooks for mouse click and mouse move.
-
         Signals beginning with 'sig' are defined by pyqtgraph
         as opposed to being defined in Qt.
         """
@@ -369,9 +231,14 @@ class Viewer(QtWidgets.QWidget):
         sigmcLEEM.connect(self.handleLEEMClick)
         sigmmvLEEM.connect(self.handleLEEMMouseMoved)
 
+        # LEED #
+        # signals
+        sigmcLEED = self.LEEDimage.scene().sigMouseClicked
+
+        sigmcLEED.connect(self.handleLEEDClick)
+
     def load_experiment(self):
         """Query User for YAML config file to load experiment settings.
-
         Adapted from my other project https://www.github.com/mgrady3/pLEASE
         """
         yamlFilter = "YAML (*.yaml);;YML (*.yml);;All Files (*)"
@@ -474,7 +341,7 @@ class Viewer(QtWidgets.QWidget):
             return
         self.tabs.setCurrentWidget(self.LEEDTab)
         if self.hasdisplayedLEEDdata:
-            # self.LEEDimageplotwidget.getPlotItem().clear()
+            self.LEEDimageplotwidget.getPlotItem().clear()
             self.LEEDivplotwidget.getPlotItem().clear()
         if self.exp.data_type.lower() == 'raw':
             try:
@@ -573,20 +440,15 @@ class Viewer(QtWidgets.QWidget):
     @QtCore.pyqtSlot()
     def update_LEED_img_after_load(self):
         """Called upon data loading I/O thread emitting finished signal."""
-        # if self.hasdisplayedLEEDdata:
-        #     self.LEEDimageplotwidget.getPlotItem().clear()
+        if self.hasdisplayedLEEDdata:
+            self.LEEDimageplotwidget.getPlotItem().clear()
         self.curLEEDIndex = self.leeddat.dat3d.shape[2]//2
-        self.LEEDimagewidget.setImage(self.leeddat.dat3d[:,
-                                                         :,
-                                                         self.curLEEDIndex])
-        """self.LEEDimage = pg.ImageItem(self.leeddat.dat3d[:,
+        self.LEEDimage = pg.ImageItem(self.leeddat.dat3d[:,
                                                          ::-1,
                                                          self.curLEEDIndex])
-
         self.LEEDimageplotwidget.addItem(self.LEEDimage)
         self.LEEDimageplotwidget.hideAxis('bottom')
         self.LEEDimageplotwidget.hideAxis('left')
-        """
         self.leeddat.elist = [self.exp.mine]
         while len(self.leeddat.elist) < self.leeddat.dat3d.shape[2]:
             newEnergy = self.leeddat.elist[-1] + self.exp.stepe
@@ -594,8 +456,9 @@ class Viewer(QtWidgets.QWidget):
         self.hasdisplayedLEEDdata = True
         title = "Reciprocal Space LEED Image: {} eV"
         energy = LF.filenumber_to_energy(self.leeddat.elist, self.curLEEDIndex)
-        # self.LEEDimageplotwidget.setTitle(title.format(energy), **self.labelStyle)
-        # self.LEEDimageplotwidget.setFocus()
+        self.LEEDimageplotwidget.setTitle(title.format(energy),
+                                          **self.labelStyle)
+        self.LEEDimageplotwidget.setFocus()
 
     def checkDataSize(self, datatype=None):
         """Ensure helper array sizes all match main data array size."""
@@ -686,19 +549,32 @@ class Viewer(QtWidgets.QWidget):
         self.LEEMivplotwidget.getPlotItem().clear()
         self.LEEMivplotwidget.getPlotItem().addItem(pdi, clear=True)
 
-    @QtCore.pyqtSlot(int, int)
-    def processLEEDIV(self, x, y):
-        """Recieve position information from ImView mouseEvent.
+    def handleLEEDClick(self, event):
+        """Draw Rect ROI and extract I(V)."""
+        if not self.hasdisplayedLEEDdata:
+            return
+        pos = event.pos()
+        print("Mouse click position: {}".format(pos))
 
-        :param: x,y - position of center of mouse click. This defines the center
-            of the rectangluar integration window used to generate the I(V)
-            curve to be displayed on self.LEEDivplotwidget
-        """
+        ctr = (int(pos.y()), int(pos.x()))  # r, c format
+        intwindow = self.leeddat.dat3d[ctr[0]-self.boxrad:ctr[0]+self.boxrad+1,
+                                       ctr[1]-self.boxrad:ctr[1]+self.boxrad+1,
+                                       :]
+        ilist = [img.sum() for img in np.rollaxis(intwindow, 2)]
+        # topleft corner cooridnates
+        xpos = pos.x() - self.boxrad
+        ypos = pos.y() - self.boxrad
 
-        int_window = self.leeddat.dat3d[y - self.boxrad:y + self.boxrad + 1,
-                                        x - self.boxrad:x + self.boxrad + 1, :]
-        ilist = [img.sum() for img in np.rollaxis(int_window, 2)]
-        self.LEEDivplotwidget.plot(self.leeddat.elist, ilist, pen='r')
+        rect = QtCore.QRectF(xpos, ypos, self.boxrad, self.boxrad)
+        pen = QtGui.QPen()
+        pen.setStyle(QtCore.Qt.SolidLine)
+        pen.setWidth(2)
+        pen.setBrush(QtCore.Qt.red)
+
+        self.LEEDimageplotwidget.scene().addRect(rect, pen=pen)
+        self.LEEDivplotwidget.plot(self.leeddat.elist,
+                                   ilist,
+                                   pen='r')
 
     def keyPressEvent(self, event):
         """Set Arrow keys for navigation."""
@@ -733,31 +609,31 @@ class Viewer(QtWidgets.QWidget):
             if (event.key() == QtCore.Qt.Key_Left) and \
                (self.curLEEDIndex >= minIdx + 1):
                 self.curLEEDIndex -= 1
-                # self.showLEEDImage(self.curLEEDIndex)
-                self.LEEDimagewidget.setImage(self.leeddat.dat3d[:,
-                                                                 :,
-                                                                 self.curLEEDIndex])
+                self.showLEEDImage(self.curLEEDIndex)
                 title = "Real Space LEED Image: {} eV"
                 energy = LF.filenumber_to_energy(self.leeddat.elist,
                                                  self.curLEEDIndex)
-                # self.LEEDimageplotwidget.setTitle(title.format(energy))
+                self.LEEDimageplotwidget.setTitle(title.format(energy))
             elif (event.key() == QtCore.Qt.Key_Right) and \
                  (self.curLEEDIndex <= maxIdx - 1):
                 self.curLEEDIndex += 1
-                # self.showLEEDImage(self.curLEEDIndex)
-                self.LEEDimagewidget.setImage(self.leeddat.dat3d[:,
-                                                                 :,
-                                                                 self.curLEEDIndex])
+                self.showLEEDImage(self.curLEEDIndex)
                 title = "Real Space LEED Image: {} eV"
                 energy = LF.filenumber_to_energy(self.leeddat.elist,
                                                  self.curLEEDIndex)
-                # self.LEEDimageplotwidget.setTitle(title.format(energy))
+                self.LEEDimageplotwidget.setTitle(title.format(energy))
 
     def showLEEMImage(self, idx):
         """Display LEEM image from main data array at index=idx."""
         if idx not in range(self.leemdat.dat3d.shape[2] - 1):
             return
         self.LEEMimage.setImage(self.leemdat.dat3d[:, :, idx].T)
+
+    def showLEEDImage(self, idx):
+        """Display LEED image from main data array at index=idx."""
+        if idx not in range(self.leeddat.dat3d.shape[2] - 1):
+            return
+        self.LEEDimage.setImage(self.leeddat.dat3d[:, ::-1, idx])
 
 
 def custom_exception_handler(exc_type, exc_value, exc_traceback):
