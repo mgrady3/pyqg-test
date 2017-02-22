@@ -16,17 +16,15 @@ class Palette(object):
     """Store color info for plotting in RGB and QColor modes."""
 
     def __init__(self):
-        """Setup RGB list as 0->1.0 float and QColor in RGB int8 format."""
-        self.color_palette = [(0.4, 0.76078, 0.64705),
-                              (0.98823, 0.55294, 0.38431),
-                              (0.55294, 0.62745, 0.79607),
-                              (0.90588, 0.54117, 0.76470),
-                              (0.65098, 0.84705, 0.32941),
-                              (1.0, 0.85098, 0.18431),
-                              (0.89804, 0.76862, 0.58039),
-                              (0.70196, 0.70196, 0.70196),
-                              (0.4, 0.76078, 0.64705),
-                              (0.98823, 0.55294, 0.38431)]
-        self.qcolors = [QtGui.QColor(int(255*tup[0]),
-                                     int(255*tup[1]),
-                                     int(255*tup[2])) for tup in self.color_palette]
+        """Setup RGB list as int8 and QColor in RGB int8 format."""
+        self.color_palette = [(192, 57, 43),
+                              (52, 152, 219),
+                              (142, 68, 173),
+                              (230, 126, 34),
+                              (124, 75, 225),
+                              (46, 204, 113),
+                              (149, 165, 166),
+                              (241, 196, 15),
+                              (26, 188, 156),
+                              (244, 114, 208)]
+        self.qcolors = [QtGui.QColor(tup[0], tup[1], tup[2]) for tup in self.color_palette]

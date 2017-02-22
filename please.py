@@ -80,10 +80,19 @@ class MainWindow(QtWidgets.QMainWindow):
 class ImView(QtWidgets.QGraphicsView):
     """Container for images using the QGV-Framework."""
 
-    ivEvent = QtCore.pyqtSignal(int, int)
+    # signal to send to Viewer object to display iv curve
+    # params: int x, int y, int color index
+    ivEvent = QtCore.pyqtSignal(int, int, int)
 
-    def __init__(self, parent=None, rad=20):
+    # signal to send to Viewer object to clear all IV curves
+    clearEvent = QtCore.pyqtSignal()
+
+    def __init__(self, colors, parent=None, rad=20):
         """Setup the QGraphicsView Framework; Analogous to Model-View Framework.
+
+        :param: colors - list of QColor objects
+        :param: parent - reference to Viewer object
+        :param: rad - user configurable setting for integration window radius
 
         :QGraphicsView: self - contains the viewport to see image data
         :QGraphicsScene: self.scene - container for items to be displayed. Scene
@@ -96,6 +105,9 @@ class ImView(QtWidgets.QGraphicsView):
             displayed in viewport.
         """
         super(QtWidgets.QGraphicsView, self).__init__(parent=parent)
+        self.num_clicks = 0
+        self.max_clicks = len(colors)
+        self.colors = colors
         self.boxrad = rad  # User configurable
         self.hasloadeddata = False
         # initialize View with random data
@@ -175,6 +187,7 @@ class ImView(QtWidgets.QGraphicsView):
         """
         if not self.hasloadeddata:
             return
+
         xp = event.pos().x()
         yp = event.pos().y()
 
@@ -185,19 +198,27 @@ class ImView(QtWidgets.QGraphicsView):
            yp + self.boxrad > self.displaydata.shape[0]:
             print("Too close to Edge.")
             return
-
+        self.num_clicks += 1
+        if self.num_clicks > self.max_clicks:
+            # reset rects
+            self.num_clicks = 1
+            for item in self.scene.items():
+                if not isinstance(item, QtWidgets.QGraphicsPixmapItem):
+                    self.scene.removeItem(item)
+            self.clearEvent.emit()
         topleftcorner = QtCore.QPointF(xp - self.boxrad,
                                        yp - self.boxrad)
         rect = QtCore.QRectF(topleftcorner.x(), topleftcorner.y(),
                              2*self.boxrad, 2*self.boxrad)
         pen = QtGui.QPen()
         pen.setStyle(QtCore.Qt.SolidLine)
-        pen.setWidth(2)
-        pen.setBrush(QtCore.Qt.red)
+        pen.setWidth(4)
+        # pen.setBrush(QtCore.Qt.red)
+        pen.setColor(self.colors[self.num_clicks - 1])
         self.scene.addRect(rect, pen=pen)
 
         # pass event location to Viewer obect for processing
-        self.ivEvent.emit(int(xp), int(yp))
+        self.ivEvent.emit(int(xp), int(yp), self.num_clicks - 1)
 
     def keyPressEvent(self, event):
         """Navigate LEED images via arrow keys."""
@@ -280,8 +301,9 @@ class Viewer(QtWidgets.QWidget):
                                           size='18pt', color='#FFFFFF')
         self.LEEDTabLayout.addWidget(self.LEEDimageplotwidget)
         """
-        self.LEEDimagewidget = ImView(parent=self, rad=self.boxrad)
+        self.LEEDimagewidget = ImView(self.qcolors, parent=self, rad=self.boxrad)
         self.LEEDimagewidget.ivEvent.connect(self.processLEEDIV)
+        self.LEEDimagewidget.clearEvent.connect(self.clearLEEDIV)
         self.LEEDTabLayout.addWidget(self.LEEDimagewidget)
         self.LEEDivplotwidget = pg.PlotWidget()
         self.LEEDivplotwidget.setLabel('bottom',
@@ -625,18 +647,25 @@ class Viewer(QtWidgets.QWidget):
         self.LEEMivplotwidget.getPlotItem().clear()
         self.LEEMivplotwidget.getPlotItem().addItem(pdi, clear=True)
 
-    @QtCore.pyqtSlot(int, int)
-    def processLEEDIV(self, x, y):
+    @QtCore.pyqtSlot(int, int, int)
+    def processLEEDIV(self, x, y, idx):
         """Recieve position information from ImView mouseEvent.
 
         :param: x,y - position of center of mouse click. This defines the center
             of the rectangluar integration window used to generate the I(V)
             curve to be displayed on self.LEEDivplotwidget
+        :param: idx - int corresponding to index of color list
         """
         int_window = self.leeddat.dat3d[y - self.boxrad:y + self.boxrad + 1,
                                         x - self.boxrad:x + self.boxrad + 1, :]
         ilist = [img.sum() for img in np.rollaxis(int_window, 2)]
-        self.LEEDivplotwidget.plot(self.leeddat.elist, ilist, pen='r')
+        self.LEEDivplotwidget.plot(self.leeddat.elist,
+                                   ilist, pen=pg.mkPen(self.qcolors[idx], width=2))
+
+    @QtCore.pyqtSlot()
+    def clearLEEDIV(self):
+        """Receive signal from ImView object indicating need to clear IV curves."""
+        self.LEEDivplotwidget.clear()
 
     def keyPressEvent(self, event):
         """Set Arrow keys for navigation."""
