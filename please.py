@@ -13,6 +13,7 @@ import yaml
 import LEEMFUNCTIONS as LF
 import numpy as np
 import pyqtgraph as pg
+from colors import Palette
 from data import LeedData, LeemData
 from experiment import Experiment
 from qthreads import WorkerThread
@@ -137,6 +138,7 @@ class ImView(QtWidgets.QGraphicsView):
 
     def setImage(self, img):
         """Display numpy array via QGraphicsPixmapItem.
+
         :param: img - must be a 2D numpy array in 16bit or 8bit format.
         """
         if not isinstance(img, np.ndarray):
@@ -168,6 +170,7 @@ class ImView(QtWidgets.QGraphicsView):
 
     def handleMouseClick(self, event):
         """Draw QRect centered on event.pos().
+
         Pass postion back to parent to process I(V) curve and display.
         """
         if not self.hasloadeddata:
@@ -233,6 +236,8 @@ class Viewer(QtWidgets.QWidget):
         Certain attributes require initialization so that their signals
         can be accessed.
         """
+        self.colors = Palette().color_palette
+        self.qcolors = Palette().qcolors
         self.leemdat = LeemData()
         self.leeddat = LeedData()
         self.exp = None  # overwritten on load with Experiment object
@@ -249,7 +254,6 @@ class Viewer(QtWidgets.QWidget):
 
     def initLEEMTab(self):
         """Setup Layout of LEEM Tab."""
-
         self.LEEMTabLayout = QtWidgets.QHBoxLayout()
         self.LEEMimageplotwidget = pg.PlotWidget()
         self.LEEMimageplotwidget.setTitle("LEEM Real Space Image",
@@ -629,7 +633,6 @@ class Viewer(QtWidgets.QWidget):
             of the rectangluar integration window used to generate the I(V)
             curve to be displayed on self.LEEDivplotwidget
         """
-
         int_window = self.leeddat.dat3d[y - self.boxrad:y + self.boxrad + 1,
                                         x - self.boxrad:x + self.boxrad + 1, :]
         ilist = [img.sum() for img in np.rollaxis(int_window, 2)]
