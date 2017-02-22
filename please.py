@@ -301,10 +301,28 @@ class Viewer(QtWidgets.QWidget):
                                           size='18pt', color='#FFFFFF')
         self.LEEDTabLayout.addWidget(self.LEEDimageplotwidget)
         """
+        self.imvbox = QtWidgets.QVBoxLayout()
+        self.ivvbox = QtWidgets.QVBoxLayout()
+
+        imtitlehbox = QtWidgets.QHBoxLayout()
+        self.LEEDTitle = QtWidgets.QLabel("Reciprocal Space LEED Image: {} eV".format(0))
+        imtitlehbox.addStretch()
+        imtitlehbox.addWidget(self.LEEDTitle)
+        imtitlehbox.addStretch()
+        self.imvbox.addLayout(imtitlehbox)
+
         self.LEEDimagewidget = ImView(self.qcolors, parent=self, rad=self.boxrad)
         self.LEEDimagewidget.ivEvent.connect(self.processLEEDIV)
         self.LEEDimagewidget.clearEvent.connect(self.clearLEEDIV)
-        self.LEEDTabLayout.addWidget(self.LEEDimagewidget)
+        self.imvbox.addWidget(self.LEEDimagewidget)
+        self.LEEDTabLayout.addLayout(self.imvbox)
+
+        ivtitlehbox = QtWidgets.QHBoxLayout()
+        ivtitlehbox.addStretch()
+        self.LEEDIVTitle = QtWidgets.QLabel("LEED-I(V)")
+        ivtitlehbox.addWidget(self.LEEDIVTitle)
+        ivtitlehbox.addStretch()
+        self.ivvbox.addLayout(ivtitlehbox)
         self.LEEDivplotwidget = pg.PlotWidget()
         self.LEEDivplotwidget.setLabel('bottom',
                                        'Energy', units='eV',
@@ -312,8 +330,8 @@ class Viewer(QtWidgets.QWidget):
         self.LEEDivplotwidget.setLabel('left',
                                        'Intensity', units='arb units',
                                        **self.labelStyle)
-        # self.LEEDimageplotwidget.addItem(self.LEEDimage)
-        self.LEEDTabLayout.addWidget(self.LEEDivplotwidget)
+        self.ivvbox.addWidget(self.LEEDivplotwidget)
+        self.LEEDTabLayout.addLayout(self.ivvbox)
         self.LEEDTab.setLayout(self.LEEDTabLayout)
 
     def initLEEMEventHooks(self):
@@ -555,8 +573,7 @@ class Viewer(QtWidgets.QWidget):
         self.hasdisplayedLEEDdata = True
         title = "Reciprocal Space LEED Image: {} eV"
         energy = LF.filenumber_to_energy(self.leeddat.elist, self.curLEEDIndex)
-        # self.LEEDimageplotwidget.setTitle(title.format(energy), **self.labelStyle)
-        # self.LEEDimageplotwidget.setFocus()
+        self.LEEDTitle.setText(title.format(energy))
 
     def checkDataSize(self, datatype=None):
         """Ensure helper array sizes all match main data array size."""
@@ -704,10 +721,10 @@ class Viewer(QtWidgets.QWidget):
                 self.LEEDimagewidget.setImage(self.leeddat.dat3d[:,
                                                                  :,
                                                                  self.curLEEDIndex])
-                title = "Real Space LEED Image: {} eV"
+                title = "Reciprocal Space LEED Image: {} eV"
                 energy = LF.filenumber_to_energy(self.leeddat.elist,
                                                  self.curLEEDIndex)
-                # self.LEEDimageplotwidget.setTitle(title.format(energy))
+                self.LEEDTitle.setText(title.format(energy))
             elif (event.key() == QtCore.Qt.Key_Right) and \
                  (self.curLEEDIndex <= maxIdx - 1):
                 self.curLEEDIndex += 1
@@ -715,10 +732,10 @@ class Viewer(QtWidgets.QWidget):
                 self.LEEDimagewidget.setImage(self.leeddat.dat3d[:,
                                                                  :,
                                                                  self.curLEEDIndex])
-                title = "Real Space LEED Image: {} eV"
+                title = "Reciprocal Space LEED Image: {} eV"
                 energy = LF.filenumber_to_energy(self.leeddat.elist,
                                                  self.curLEEDIndex)
-                # self.LEEDimageplotwidget.setTitle(title.format(energy))
+                self.LEEDTitle.setText(title.format(energy))
 
     def showLEEMImage(self, idx):
         """Display LEEM image from main data array at index=idx."""
