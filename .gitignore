@@ -21,3 +21,7 @@ datapath.txt
 # IDE files #
 #############
 .idea
+
+# Build/Deploy files #
+######################
+./test-deploy/*
