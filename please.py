@@ -610,7 +610,22 @@ class Viewer(QtWidgets.QWidget):
             return
 
     def handleLEEMClick(self, event):
-        """User click in image area."""
+        """User click in image area.
+
+        There is a discrepancy between the mouse position as recorded
+        by the event passed from sigMouseMoved versus the mouse position
+        as recorded by sigMouseClicked. The problem appears to be related
+        to having a Title set on the plot area. The mouse click coordinates
+        are offset in the y direction by roughly 20 units. To remedy this
+        one possibility is  to manually offset the y coordinate, but its not
+        clear if the number should always be 20 or it it differs by screen size
+        or resolution.
+
+        Thus to address the issue, handleMouseMoved records the current mouse
+        position and saves to a tuple (x, y) stored as currentLEEMPos. Then
+        handleMouseClick extracts the I(V) curve from the stored coordinates
+        rather than from the received mouse cooridnates from the click event.
+        """
         if not self.hasdisplayedLEEMdata:
             return
 
@@ -624,13 +639,20 @@ class Viewer(QtWidgets.QWidget):
         mappedPos = self.LEEMimage.mapFromScene(pos)
         xmp = int(mappedPos.x())
         ymp = int(mappedPos.y())
+        # ymp -= 20  # title interferes with y coordinate
 
         if xmp < 0 or \
            xmp > self.leemdat.dat3d.shape[1] or \
            ymp < 0 or \
            ymp > self.leemdat.dat3d.shape[0]:
             return  # discard click events originating outside the image
+
+        # xmp = int(event.pos().x())
+        # ymp = int(event.pos().y())
+        # print("Mouse Click at: {0}, {1}".format(xmp, ymp))
         try:
+            xmp = self.currentLEEMPos[0]
+            ymp = self.currentLEEMPos[1]
             pw = pg.plot(self.leemdat.elist,
                          self.leemdat.dat3d[ymp, xmp, :],
                          title='LEEM-I(V)')
@@ -667,6 +689,8 @@ class Viewer(QtWidgets.QWidget):
         self.crosshair.curPos = (xmp, ymp)
         self.crosshair.vline.setPos(xmp)
         self.crosshair.hline.setPos(ymp)
+        self.currentLEEMPos = (xmp, ymp)
+        # print("Mouse moved to: {0}, {1}".format(xmp, ymp))
 
         # update IV plot
         xdata = self.leemdat.elist
@@ -680,7 +704,7 @@ class Viewer(QtWidgets.QWidget):
             self.leemdat.dat3ds[ymp, xmp, :] = ydata
             self.leemdat.posMask[ymp, xmp] = 1
         pen = pg.mkPen(self.qcolors[0], width=2)
-        pdi = pg.PlotDataItem(xdata, ydata, pen='r')
+        pdi = pg.PlotDataItem(xdata, ydata, pen=pen)
         self.LEEMivplotwidget.getPlotItem().clear()
         self.LEEMivplotwidget.getPlotItem().addItem(pdi, clear=True)
 
