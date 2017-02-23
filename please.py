@@ -685,11 +685,10 @@ class Viewer(QtWidgets.QWidget):
             return  # discard  movement events originating outside the image
 
         # update crosshair
-        # self.ch.setPos(xmp, ymp)
         self.crosshair.curPos = (xmp, ymp)
         self.crosshair.vline.setPos(xmp)
         self.crosshair.hline.setPos(ymp)
-        self.currentLEEMPos = (xmp, ymp)
+        self.currentLEEMPos = (xmp, ymp)  # used for handleLEEMClick()
         # print("Mouse moved to: {0}, {1}".format(xmp, ymp))
 
         # update IV plot
