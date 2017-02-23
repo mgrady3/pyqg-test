@@ -7,6 +7,8 @@ Date: February, 2017
 
 Contained here are color definitions for use in color coding plots to
 user selected areas in LEEM and LEED images.
+
+Colors are chosen from Flat UI colors based on the Google Material Design UI
 """
 
 from PyQt5 import QtGui
