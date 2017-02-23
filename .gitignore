@@ -24,4 +24,4 @@ datapath.txt
 
 # Build/Deploy files #
 ######################
-./test-deploy/*
+./test-deploy/
