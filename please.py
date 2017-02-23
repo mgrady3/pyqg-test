@@ -276,10 +276,23 @@ class Viewer(QtWidgets.QWidget):
     def initLEEMTab(self):
         """Setup Layout of LEEM Tab."""
         self.LEEMTabLayout = QtWidgets.QHBoxLayout()
+        imvbox = QtWidgets.QVBoxLayout()
+        blanklabel = QtWidgets.QLabel()
+        imvbox.addWidget(blanklabel)
         self.LEEMimageplotwidget = pg.PlotWidget()
         self.LEEMimageplotwidget.setTitle("LEEM Real Space Image",
                                           size='18pt', color='#FFFFFF')
-        self.LEEMTabLayout.addWidget(self.LEEMimageplotwidget)
+        imvbox.addWidget(self.LEEMimageplotwidget)
+        self.LEEMTabLayout.addLayout(imvbox)
+
+        ivvbox = QtWidgets.QVBoxLayout()
+        titlehbox = QtWidgets.QHBoxLayout()
+        self.LEEMIVTitle = QtWidgets.QLabel("LEEM-I(V)")
+        titlehbox.addStretch()
+        titlehbox.addWidget(self.LEEMIVTitle)
+        titlehbox.addStretch()
+        ivvbox.addLayout(titlehbox)
+
         self.LEEMivplotwidget = pg.PlotWidget()
         self.LEEMivplotwidget.setLabel('bottom',
                                        'Energy', units='eV',
@@ -289,8 +302,14 @@ class Viewer(QtWidgets.QWidget):
                                        **self.labelStyle)
 
         self.LEEMimageplotwidget.addItem(self.LEEMimage)
-        self.LEEMTabLayout.addWidget(self.LEEMivplotwidget)
+        ivvbox.addWidget(self.LEEMivplotwidget)
+        self.LEEMTabLayout.addLayout(ivvbox)
         self.LEEMTab.setLayout(self.LEEMTabLayout)
+
+        # ivheight = self.LEEMivplotwidget.frameGeometry().height()
+        # ivwidth = self.LEEMivplotwidget.frameGeometry().width()
+        # self.LEEMimageplotwidget.setMaximumHeight(ivheight)
+        # self.LEEMimageplotwidget.setSizePolicy()
 
     def initLEEDTab(self):
         """Setup Layout of LEED Tab."""
