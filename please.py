@@ -660,6 +660,7 @@ class Viewer(QtWidgets.QWidget):
                               window_type='flat')
             self.leemdat.dat3ds[ymp, xmp, :] = ydata
             self.leemdat.posMask[ymp, xmp] = 1
+        pen = pg.mkPen(self.qcolors[0], width=2)
         pdi = pg.PlotDataItem(xdata, ydata, pen='r')
         self.LEEMivplotwidget.getPlotItem().clear()
         self.LEEMivplotwidget.getPlotItem().addItem(pdi, clear=True)
