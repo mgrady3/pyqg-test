@@ -6,18 +6,21 @@ Version 1.0.0
 Date: February, 2017
 """
 
+# Stdlib and Scientific Stack imports
 import os
 import sys
 import traceback
 import yaml
-import LEEMFUNCTIONS as LF
 import numpy as np
 import pyqtgraph as pg
+from PyQt5 import QtCore, QtGui, QtWidgets
+
+# local project imports
+import LEEMFUNCTIONS as LF
 from colors import Palette
 from data import LeedData, LeemData
 from experiment import Experiment
 from qthreads import WorkerThread
-from PyQt5 import QtCore, QtGui, QtWidgets
 from terminal import MessageConsole
 
 __Version = '1.0.0'
@@ -28,6 +31,7 @@ class ExtendedCrossHair(QtCore.QObject):
     """Set of perpindicular InfiniteLines tracking mouse postion."""
 
     def __init__(self):
+        """."""
         super(ExtendedCrossHair, self).__init__()
         self.hline = pg.InfiniteLine(angle=0, movable=False)
         self.vline = pg.InfiniteLine(angle=90, movable=False)
@@ -74,6 +78,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     @staticmethod
     def quit():
+        """."""
         QtWidgets.QApplication.instance().quit()
 
 
