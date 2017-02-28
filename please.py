@@ -4,6 +4,15 @@ Author: Maxwell Grady
 Affiliation: University of New Hampshire Department of Physics Pohl group
 Version 1.0.0
 Date: February, 2017
+
+PLEASE provides a convienient Graphical User Interface for exploration and
+analysis of Low Energy Electron Microscopy and Diffraction data sets.
+Specifically, emphasis is placed on visualization of Intensity-Voltage data
+sets and providing an easy popint and click method for extracting I(V) curves.
+
+Analysis of LEEM-I(V) and LEED-I(V) data sets provides inisght with atomic
+scale resolution to the surface structure of a wide array of materials from
+semiconductors to metals in bulk or thin film as well as single layer 2D materials.
 """
 
 # Stdlib and Scientific Stack imports
@@ -51,6 +60,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setWindowTitle("PLEASE v. {}".format(v))
         self.viewer = Viewer()
         self.setCentralWidget(self.viewer)
+
+        self.menubar = self.menuBar()
+        self.setupMenu()
+
         self.setupDockableWidgets()
         self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.dockwidget)
         self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, self.bottomdock)
@@ -75,6 +88,26 @@ class MainWindow(QtWidgets.QMainWindow):
         self.bottomdock = QtWidgets.QDockWidget(self)
         self.console = MessageConsole()
         self.bottomdock.setWidget(self.console)
+
+    def setupMenu(self):
+        """Set Menu actions for LEEM and LEED."""
+        fileMenu = self.menubar.addMenu("File")
+        LEEMMenu = self.menubar.addMenu("LEEM")
+        LEEDMenu = self.menubar.addMenu("LEED")
+
+        # File menu
+        exitAction = QtWidgets.QAction("Exit", self)
+        exitAction.setShortcut('Ctrl+Q')
+        exitAction.triggered.connect(self.quit)
+        fileMenu.addAction(exitAction)
+
+        # LEEM menu
+
+        # LEED menu
+        extractAction = QtWidgets.QAction("Extract I(V)", self)
+        extractAction.setShortcut("Ctrl-E")
+        extractAction.triggered.connect(self.viewer.LEEDimagewidget.emitIV)
+        LEEDMenu.addAction(extractAction)
 
     @staticmethod
     def quit():
@@ -112,6 +145,7 @@ class ImView(QtWidgets.QGraphicsView):
         super(QtWidgets.QGraphicsView, self).__init__(parent=parent)
         self.num_clicks = 0
         self.max_clicks = len(colors)
+        self.rects = []  # container to hold QRectF objects
         self.colors = colors
         self.boxrad = rad  # User configurable
         self.hasloadeddata = False
@@ -203,6 +237,7 @@ class ImView(QtWidgets.QGraphicsView):
            yp + self.boxrad > self.displaydata.shape[0]:
             print("Too close to Edge.")
             return
+
         self.num_clicks += 1
         if self.num_clicks > self.max_clicks:
             # reset rects
@@ -211,6 +246,8 @@ class ImView(QtWidgets.QGraphicsView):
                 if not isinstance(item, QtWidgets.QGraphicsPixmapItem):
                     self.scene.removeItem(item)
             self.clearEvent.emit()
+            self.rects = []
+
         topleftcorner = QtCore.QPointF(xp - self.boxrad,
                                        yp - self.boxrad)
         rect = QtCore.QRectF(topleftcorner.x(), topleftcorner.y(),
@@ -221,9 +258,19 @@ class ImView(QtWidgets.QGraphicsView):
         # pen.setBrush(QtCore.Qt.red)
         pen.setColor(self.colors[self.num_clicks - 1])
         self.scene.addRect(rect, pen=pen)
+        self.rects.append((rect, pen))
 
         # pass event location to Viewer obect for processing
-        self.ivEvent.emit(int(xp), int(yp), self.num_clicks - 1)
+        # self.ivEvent.emit(int(xp), int(yp), self.num_clicks - 1)
+
+    def emitIV(self):
+        """Send signal to Viewer to plot I(V) for current selections."""
+        for idx, tup in enumerate(self.rects):
+            rect = tup[0]
+            center = rect.center()
+            xp = center.x()
+            yp = center.y()
+            self.ivEvent.emit(int(xp), int(yp), idx)
 
     def keyPressEvent(self, event):
         """Navigate LEED images via arrow keys."""
