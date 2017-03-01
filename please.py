@@ -72,16 +72,25 @@ class MainWindow(QtWidgets.QMainWindow):
         """Dock control and information widgets to main window."""
         # Leftside button widgets
         self.dockwidget = QtWidgets.QDockWidget(self)
+
+        # setup pushbutton functions
         self.groupbox = QtWidgets.QGroupBox()
         self.buttonboxlayout = QtWidgets.QVBoxLayout()
         self.loadexperimentbutton = QtWidgets.QPushButton("Load Experiment")
         self.loadexperimentbutton.clicked.connect(self.viewer.load_experiment)
+        self.outputLEEMbutton = QtWidgets.QPushButton("Output LEEM Data")
+        self.outputLEEDbutton = QtWidgets.QPushButton("Output LEED Data")
+        self.outputLEEMbutton.clicked.connect(lambda: self.viewer.outputIV(datatype='LEEM'))
+        self.outputLEEDbutton.clicked.connect(lambda: self.viewer.outputIV(datatype='LEED'))
         self.quitbutton = QtWidgets.QPushButton("Quit")
         self.quitbutton.clicked.connect(self.quit)
         self.buttonboxlayout.addWidget(self.loadexperimentbutton)
+        self.buttonboxlayout.addWidget(self.outputLEEMbutton)
+        self.buttonboxlayout.addWidget(self.outputLEEDbutton)
         self.buttonboxlayout.addStretch()
         self.buttonboxlayout.addWidget(self.quitbutton)
         self.groupbox.setLayout(self.buttonboxlayout)
+
         self.dockwidget.setWidget(self.groupbox)
 
         # bottom message console
@@ -102,6 +111,9 @@ class MainWindow(QtWidgets.QMainWindow):
         fileMenu.addAction(exitAction)
 
         # LEEM menu
+        outputLEEMAction = QtWidgets.QAction("Output I(V)", self)
+        outputLEEMAction.triggered.connect(lambda: self.viewer.outputIV(datatype='LEEM'))
+        LEEMMenu.addAction(outputLEEMAction)
 
         # LEED menu
         extractAction = QtWidgets.QAction("Extract I(V)", self)
@@ -567,6 +579,14 @@ class Viewer(QtWidgets.QWidget):
                 print('Required parameters: data path and data extension.')
                 print('Valid data extenstions: \'.tif\', \'.png\', \'.jpg\'')
                 return
+
+    def outputIV(self, datatype=None):
+        """Output current I(V) plots as tab delimited text files.
+
+        :param: datatype- String desginating either 'LEEM' or 'LEED' data to output
+        """
+        if datatype is None:
+            return
 
     @QtCore.pyqtSlot(np.ndarray)
     def retrieve_LEEM_data(self, data):
