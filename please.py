@@ -226,6 +226,10 @@ class ImView(QtWidgets.QGraphicsView):
         self.graphicspixmapitem = QtWidgets.QGraphicsPixmapItem(
                                          QtGui.QPixmap.fromImage(self.image))
         self.scene.addItem(self.graphicspixmapitem)
+        if self.rects:
+            for idx, rect in enumerate(self.rects):
+                # rects are stored as a tuple of (QRectF, QPen)
+                self.scene.addRect(rect[0], pen=rect[1])
         self.fitInView(self.scene.sceneRect(), QtCore.Qt.KeepAspectRatio)
         self.hasloadeddata = True
         self.setScene(self.scene)
@@ -271,9 +275,6 @@ class ImView(QtWidgets.QGraphicsView):
         pen.setColor(self.colors[self.num_clicks - 1])
         self.scene.addRect(rect, pen=pen)
         self.rects.append((rect, pen))
-
-        # pass event location to Viewer obect for processing
-        # self.ivEvent.emit(int(xp), int(yp), self.num_clicks - 1)
 
     def emitIV(self):
         """Send signal to Viewer to plot I(V) for current selections."""
@@ -321,10 +322,22 @@ class Viewer(QtWidgets.QWidget):
         Certain attributes require initialization so that their signals
         can be accessed.
         """
+        self.threads = []  # container for QThread objects used for outputting files
+
         self.colors = Palette().color_palette
         self.qcolors = Palette().qcolors
         self.leemdat = LeemData()
         self.leeddat = LeedData()
+        self.LEEMselections = []  # store coords of leem clicks in (r,c) format
+        self.LEEDselections = []  # store coords of leed clicks in (r,c) format
+
+        self.smoothLEEDoutput = False
+        self.smoothLEEMoutput = False
+        self.LEEDWindowType = 'flat'
+        self.LEEMWindowType = 'flat'
+        self.LEEDWindowLen = 4
+        self.LEEMWindowLen = 4
+
         self.exp = None  # overwritten on load with Experiment object
         self.hasdisplayedLEEMdata = False
         self.hasdisplayedLEEDdata = False
@@ -587,6 +600,66 @@ class Viewer(QtWidgets.QWidget):
         """
         if datatype is None:
             return
+        elif datatype == 'LEEM' and self.hasdisplayedLEEMdata and self.LEEMselections:
+            pass
+        elif datatype == 'LEED' and self.hasdisplayedLEEDdata and self.LEEDselections:
+            # Query User for output directory
+            # PyQt5 - This method now returns a tuple - we want only the first element
+            outdir = QtWidgets.QFileDialog.getExistingDirectory(self, "Select Output Directory",
+                                                                options=QtWidgets.QFileDialog.ShowDirsOnly)
+            try:
+                outdir = outdir[0]
+            except IndexError:
+                print("Error selecting output file directory.")
+                return
+            outdir = str(outdir)  # cast from QString to string
+
+            # Query User for output file name
+            msg = "Enter name for output file(s)."
+            outname = QtWidgets.QFileDialog.getSaveFileName(self, msg)
+
+            try:
+                outname = outname[0]
+            except IndexError:
+                print("Error getting output file name.")
+                return
+            outname = str(outname)  # cast from QString ot string
+
+            outfile = os.path.join(outdir, outname)
+            if self.threads:
+                # there are still thread objects in the container
+                for thread in self.threads:
+                    if not thread.isFinished():
+                        print("Error: One or more threads has not finished file I/O ...")
+                        return
+            self.threads = []
+            for idx, tup in enumerate(self.LEEDselections):
+                outfile = os.path.join(outdir, outname+str(idx)+'.txt')
+                x = tup[1]
+                y = tup[0]
+                int_window = self.leeddat.dat3d[y - self.boxrad:y + self.boxrad + 1,
+                                                x - self.boxrad:x + self.boxrad + 1, :]
+                ilist = [img.sum() for img in np.rollaxis(int_window, 2)]
+                if self.smoothLEEDoutput:
+                    ilist = LF.smooth(ilist,
+                                      window_len=self.LEEDWindowLen,
+                                      window_type=self.LEEDWindowType)
+                thread = WorkerThread(task='OUTPUT_TO_TEXT',
+                                           elist=self.leeddat.elist,
+                                           ilist=ilist,
+                                           name=outfile)
+                thread.finished.connect(self.output_complete)
+                self.threads.append(thread)
+                thread.start()
+
+        else:
+            return
+
+    @staticmethod
+    @QtCore.pyqtSlot()
+    def output_complete():
+        """Recieved a finished() SIGNAL from a QThread object."""
+        print('File output successfully')
 
     @QtCore.pyqtSlot(np.ndarray)
     def retrieve_LEEM_data(self, data):
@@ -725,6 +798,7 @@ class Viewer(QtWidgets.QWidget):
         try:
             xmp = self.currentLEEMPos[0]
             ymp = self.currentLEEMPos[1]
+            # self.LEEMselections.append((ymp, xmp))
             pw = pg.plot(self.leemdat.elist,
                          self.leemdat.dat3d[ymp, xmp, :],
                          title='LEEM-I(V)')
@@ -788,6 +862,7 @@ class Viewer(QtWidgets.QWidget):
             curve to be displayed on self.LEEDivplotwidget
         :param: idx - int corresponding to index of color list
         """
+        self.LEEDselections.append((y, x))
         int_window = self.leeddat.dat3d[y - self.boxrad:y + self.boxrad + 1,
                                         x - self.boxrad:x + self.boxrad + 1, :]
         ilist = [img.sum() for img in np.rollaxis(int_window, 2)]
@@ -798,6 +873,7 @@ class Viewer(QtWidgets.QWidget):
     def clearLEEDIV(self):
         """Receive signal from ImView object indicating need to clear IV curves."""
         self.LEEDivplotwidget.clear()
+        self.LEEDselections = []
 
     def keyPressEvent(self, event):
         """Set Arrow keys for navigation."""
