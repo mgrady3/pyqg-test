@@ -306,11 +306,13 @@ class Viewer(QtWidgets.QWidget):
         self.tabs = QtWidgets.QTabWidget()
         self.LEEMTab = QtWidgets.QWidget()
         self.LEEDTab = QtWidgets.QWidget()
+        self.ConfigTab = QtWidgets.QWidget()
         self.initLEEMTab()
         self.initLEEDTab()
         self.tabs.addTab(self.LEEMTab, "LEEM-I(V)")
         self.initLEEMEventHooks()
         self.tabs.addTab(self.LEEDTab, "LEED-I(V)")
+        self.tabs.addTab(self.ConfigTab, "Config")
 
         self.layout.addWidget(self.tabs)
         self.setLayout(self.layout)
@@ -322,6 +324,12 @@ class Viewer(QtWidgets.QWidget):
         Certain attributes require initialization so that their signals
         can be accessed.
         """
+        self.staticLEEMplot = pg.PlotWidget()  # not displayed until User clicks LEEM image
+
+        # container for circular patches indicating locations of User clicks in LEEM image
+        self.LEEMcircs = []
+        self.LEEMclicks = 0
+
         self.threads = []  # container for QThread objects used for outputting files
 
         self.colors = Palette().color_palette
@@ -354,11 +362,16 @@ class Viewer(QtWidgets.QWidget):
         """Setup Layout of LEEM Tab."""
         self.LEEMTabLayout = QtWidgets.QHBoxLayout()
         imvbox = QtWidgets.QVBoxLayout()
-        blanklabel = QtWidgets.QLabel()
-        imvbox.addWidget(blanklabel)
+        imtitlehbox = QtWidgets.QHBoxLayout()
+
+        self.LEEMimtitle = QtWidgets.QLabel("LEEM Real Space Image")
+        imtitlehbox.addStretch()
+        imtitlehbox.addWidget(self.LEEMimtitle)
+        imtitlehbox.addStretch()
+        imvbox.addLayout(imtitlehbox)
         self.LEEMimageplotwidget = pg.PlotWidget()
-        self.LEEMimageplotwidget.setTitle("LEEM Real Space Image",
-                                          size='18pt', color='#FFFFFF')
+        # self.LEEMimageplotwidget.setTitle("LEEM Real Space Image",
+        #                                  size='18pt', color='#FFFFFF')
         imvbox.addWidget(self.LEEMimageplotwidget)
         self.LEEMTabLayout.addLayout(imvbox)
 
@@ -601,7 +614,51 @@ class Viewer(QtWidgets.QWidget):
         if datatype is None:
             return
         elif datatype == 'LEEM' and self.hasdisplayedLEEMdata and self.LEEMselections:
-            pass
+            outdir = QtWidgets.QFileDialog.getExistingDirectory(self, "Select Output Directory",
+                                                                options=QtWidgets.QFileDialog.ShowDirsOnly)
+            try:
+                outdir = outdir[0]
+            except IndexError:
+                print("Error selecting output file directory.")
+                return
+            outdir = str(outdir)  # cast from QString to string
+
+            # Query User for output file name
+            msg = "Enter name for output file(s)."
+            outname = QtWidgets.QFileDialog.getSaveFileName(self, msg)
+
+            try:
+                outname = outname[0]
+            except IndexError:
+                print("Error getting output file name.")
+                return
+            outname = str(outname)  # cast from QString ot string
+
+            outfile = os.path.join(outdir, outname)
+            if self.threads:
+                # there are still thread objects in the container
+                for thread in self.threads:
+                    if not thread.isFinished():
+                        print("Error: One or more threads has not finished file I/O ...")
+                        return
+            self.threads = []
+            for idx, tup in enumerate(self.LEEMselections):
+                outfile = os.path.join(outdir, outname+str(idx)+'.txt')
+                x = tup[1]
+                y = tup[0]
+                ilist = self.leemdat.dat3d[y, x, :]
+                if self.smoothLEEMoutput:
+                    ilist = LF.smooth(ilist,
+                                      window_len=self.LEEMWindowLen,
+                                      window_type=self.LEEMWindowType)
+                thread = WorkerThread(task='OUTPUT_TO_TEXT',
+                                           elist=self.leemdat.elist,
+                                           ilist=ilist,
+                                           name=outfile)
+                thread.finished.connect(self.output_complete)
+                self.threads.append(thread)
+                thread.start()
+
         elif datatype == 'LEED' and self.hasdisplayedLEEDdata and self.LEEDselections:
             # Query User for output directory
             # PyQt5 - This method now returns a tuple - we want only the first element
@@ -651,9 +708,6 @@ class Viewer(QtWidgets.QWidget):
                 thread.finished.connect(self.output_complete)
                 self.threads.append(thread)
                 thread.start()
-
-        else:
-            return
 
     @staticmethod
     @QtCore.pyqtSlot()
@@ -709,8 +763,9 @@ class Viewer(QtWidgets.QWidget):
         self.hasdisplayedLEEMdata = True
         title = "Real Space LEEM Image: {} eV"
         energy = LF.filenumber_to_energy(self.leemdat.elist, self.curLEEMIndex)
-        self.LEEMimageplotwidget.setTitle(title.format(energy),
-                                          **self.labelStyle)
+        # self.LEEMimageplotwidget.setTitle(title.format(energy),
+        #                                  **self.labelStyle)
+        self.LEEMimtitle.setText(title.format(energy))
         self.LEEMimageplotwidget.setFocus()
 
     @QtCore.pyqtSlot()
@@ -780,33 +835,55 @@ class Viewer(QtWidgets.QWidget):
         if event.currentItem is None:
             return
 
+        self.LEEMclicks += 1
+        if self.LEEMclicks > len(self.qcolors):
+            self.LEEMclicks = 1
+            if self.staticLEEMplot.isVisible():
+                self.staticLEEMplot.clear()
+            if self.LEEMcircs:
+                for circ in self.LEEMcircs:
+                    self.LEEMimageplotwidget.scene().removeItem(circ)
+            self.LEEMcircs = []
+            self.LEEMselections = []
+
         pos = event.pos()
         mappedPos = self.LEEMimage.mapFromScene(pos)
-        xmp = int(mappedPos.x())
-        ymp = int(mappedPos.y())
-        # ymp -= 20  # title interferes with y coordinate
+        xmapfs = int(mappedPos.x())
+        ymapfs = int(mappedPos.y())
 
-        if xmp < 0 or \
-           xmp > self.leemdat.dat3d.shape[1] or \
-           ymp < 0 or \
-           ymp > self.leemdat.dat3d.shape[0]:
+        if xmapfs < 0 or \
+           xmapfs > self.leemdat.dat3d.shape[1] or \
+           ymapfs < 0 or \
+           ymapfs > self.leemdat.dat3d.shape[0]:
             return  # discard click events originating outside the image
 
-        # xmp = int(event.pos().x())
-        # ymp = int(event.pos().y())
-        # print("Mouse Click at: {0}, {1}".format(xmp, ymp))
-        try:
-            xmp = self.currentLEEMPos[0]
-            ymp = self.currentLEEMPos[1]
-            # self.LEEMselections.append((ymp, xmp))
-            pw = pg.plot(self.leemdat.elist,
-                         self.leemdat.dat3d[ymp, xmp, :],
-                         title='LEEM-I(V)')
-        except IndexError:
-            return
-        pw.setLabel('bottom', 'Energy', units='eV', **self.labelStyle)
-        pw.setLabel('left', 'Intensity', units='a.u.', **self.labelStyle)
-        pw.show()
+        if self.currentLEEMPos is not None:
+            try:
+                # mouse position
+                xmp = self.currentLEEMPos[0]
+                ymp = self.currentLEEMPos[1]  # x and y in data coordinates
+            except IndexError:
+                return
+        xdata = self.leemdat.elist
+        ydata = self.leemdat.dat3d[ymp, xmp, :]
+
+        brush = QtGui.QBrush(self.qcolors[self.LEEMclicks - 1])
+        rad = 8
+        x = pos.x() - rad/2  # offset for QRectF
+        y = pos.y() - rad/2  # offset for QRectF
+
+        circ = self.LEEMimageplotwidget.scene().addEllipse(x, y, rad, rad, brush=brush)
+        self.LEEMcircs.append(circ)
+        self.LEEMselections.append((ymp, xmp))  # (r,c) format
+
+        pen = pg.mkPen(self.qcolors[self.LEEMclicks - 1], width=2)
+        pdi = pg.PlotDataItem(xdata, ydata, pen=pen)
+        self.staticLEEMplot.setTitle("LEEM-I(V)")
+        self.staticLEEMplot.setLabel('bottom', 'Energy', units='eV', **self.labelStyle)
+        self.staticLEEMplot.setLabel('left', 'Intensity', units='a.u.', **self.labelStyle)
+        self.staticLEEMplot.addItem(pdi)
+        if not self.staticLEEMplot.isVisible():
+            self.staticLEEMplot.show()
 
     def handleLEEMMouseMoved(self, pos):
         """Track mouse movement within LEEM image area."""
@@ -890,7 +967,8 @@ class Viewer(QtWidgets.QWidget):
                 title = "Real Space LEEM Image: {} eV"
                 energy = LF.filenumber_to_energy(self.leemdat.elist,
                                                  self.curLEEMIndex)
-                self.LEEMimageplotwidget.setTitle(title.format(energy))
+                # self.LEEMimageplotwidget.setTitle(title.format(energy))
+                self.LEEMimtitle.setText(title.format(energy))
             elif (event.key() == QtCore.Qt.Key_Right) and \
                  (self.curLEEMIndex <= maxIdx - 1):
                 self.curLEEMIndex += 1
@@ -898,7 +976,8 @@ class Viewer(QtWidgets.QWidget):
                 title = "Real Space LEEM Image: {} eV"
                 energy = LF.filenumber_to_energy(self.leemdat.elist,
                                                  self.curLEEMIndex)
-                self.LEEMimageplotwidget.setTitle(title.format(energy))
+                # self.LEEMimageplotwidget.setTitle(title.format(energy))
+                self.LEEMimtitle.setText(title.format(energy))
         # LEED Tab is active
         elif (self.tabs.currentIndex() == 1) and \
              (self.hasdisplayedLEEDdata):
