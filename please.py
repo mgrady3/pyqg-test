@@ -309,6 +309,7 @@ class Viewer(QtWidgets.QWidget):
         self.ConfigTab = QtWidgets.QWidget()
         self.initLEEMTab()
         self.initLEEDTab()
+        self.initConfigTab()
         self.tabs.addTab(self.LEEMTab, "LEEM-I(V)")
         self.initLEEMEventHooks()
         self.tabs.addTab(self.LEEDTab, "LEED-I(V)")
@@ -401,6 +402,135 @@ class Viewer(QtWidgets.QWidget):
         # self.LEEMimageplotwidget.setMaximumHeight(ivheight)
         # self.LEEMimageplotwidget.setSizePolicy()
 
+    def initConfigTab(self):
+        """Setup Layout of Config Tab."""
+        configTabGroupbox = QtWidgets.QGroupBox()
+        configtabBottomButtonHBox = QtWidgets.QHBoxLayout()
+        configTabGroupButtonBox = QtWidgets.QHBoxLayout()
+        configTabVBox = QtWidgets.QVBoxLayout()
+
+        self.quitbut = QtWidgets.QPushButton("Quit", self)
+        # self.quitbut.clicked.connect(self.Quit)
+
+        self.setEnergyLEEMBut = QtWidgets.QPushButton("Set LEEM Energy", self)
+        # self.setEnergyLEEMBut.clicked.connect(lambda: pass)
+
+        self.setEnergyLEEDBut = QtWidgets.QPushButton("Set LEED Energy", self)
+        # self.setEnergyLEEDBut.clicked.connect(lambda: pass)
+
+        self.toggleDebugBut = QtWidgets.QPushButton("Toggle DEBUG mode")
+        # self.toggleDebugBut.clicked.connect(lambda: pass)
+
+        self.swapLEEMByteOrderBut = QtWidgets.QPushButton("Swap LEEM Byte Order")
+        # self.swapLEEMByteOrderBut.clicked.connect(lambda: pass)
+
+        self.swapLEEDByteOrderBut = QtWidgets.QPushButton("Swap LEED Byte Order")
+        # self.swapLEEDByteOrderBut.clicked.connect(lambda: pass)
+
+        buttons = [self.setEnergyLEEMBut, self.setEnergyLEEDBut,
+                   self.toggleDebugBut, self.swapLEEDByteOrderBut,
+                   self.swapLEEMByteOrderBut]
+
+        configTabGroupButtonBox.addStretch()
+        for b in buttons:
+            configTabGroupButtonBox.addWidget(b)
+            configTabGroupButtonBox.addStretch()
+        configTabGroupbox.setLayout(configTabGroupButtonBox)
+
+        configTabVBox.addWidget(configTabGroupbox)
+        configTabVBox.addWidget(self.h_line())
+
+        # smooth settings
+        smoothLEEDVBox = QtWidgets.QVBoxLayout()
+        smoothColumn = QtWidgets.QHBoxLayout()
+        smoothGroupBox = QtWidgets.QGroupBox()
+
+        # LEED
+        self.LEEDSettingsLabel = QtWidgets.QLabel("LEED Data Smoothing Settings")
+        smoothLEEDVBox.addWidget(self.LEEDSettingsLabel)
+
+        self.smoothLEEDCheckBox = QtWidgets.QCheckBox()
+        self.smoothLEEDCheckBox.setText("Enable Smoothing")
+        # self.smoothLEEDCheckBox.stateChanged.connect(lambda: pass)
+        smoothLEEDVBox.addWidget(self.smoothLEEDCheckBox)
+
+        window_LEED_hbox = QtWidgets.QHBoxLayout()
+        self.LEED_window_label = QtWidgets.QLabel("Select Window Type")
+        self.smooth_LEED_window_type_menu = QtWidgets.QComboBox()
+        self.smooth_LEED_window_type_menu.addItem("Flat")
+        self.smooth_LEED_window_type_menu.addItem("Hanning")
+        self.smooth_LEED_window_type_menu.addItem("Hamming")
+        self.smooth_LEED_window_type_menu.addItem("Bartlett")
+        self.smooth_LEED_window_type_menu.addItem("Blackman")
+        window_LEED_hbox.addWidget(self.LEED_window_label)
+        window_LEED_hbox.addWidget(self.smooth_LEED_window_type_menu)
+        smoothLEEDVBox.addLayout(window_LEED_hbox)
+
+        LEED_window_len_box = QtWidgets.QHBoxLayout()
+        self.LEED_window_len_label = QtWidgets.QLabel("Enter Window Length [even integer]")
+        self.LEED_window_len_entry = QtWidgets.QLineEdit()
+
+        LEED_window_len_box.addWidget(self.LEED_window_len_label)
+        LEED_window_len_box.addWidget(self.LEED_window_len_entry)
+        smoothLEEDVBox.addLayout(LEED_window_len_box)
+
+        self.apply_settings_LEED_button = QtWidgets.QPushButton("Apply Smoothing Settings", self)
+        # self.apply_settings_LEED_button.clicked.connect(lambda: pass)
+        smoothLEEDVBox.addWidget(self.apply_settings_LEED_button)
+
+        smoothColumn.addLayout(smoothLEEDVBox)
+        smoothColumn.addStretch()
+        smoothColumn.addWidget(self.v_line())
+        smoothColumn.addStretch()
+
+        # LEEM
+        smooth_LEEM_vbox = QtWidgets.QVBoxLayout()
+        smooth_group = QtWidgets.QGroupBox()
+
+        self.LEEM_settings_label = QtWidgets.QLabel("LEEM Data Smoothing Settings")
+        smooth_LEEM_vbox.addWidget(self.LEEM_settings_label)
+
+        self.smooth_LEEM_checkbox = QtWidgets.QCheckBox()
+        self.smooth_LEEM_checkbox.setText("Enable Smoothing")
+        # self.smooth_LEEM_checkbox.stateChanged.connect(self.smooth_LEEM_state_change)
+        smooth_LEEM_vbox.addWidget(self.smooth_LEEM_checkbox)
+
+        window_LEEM_hbox = QtWidgets.QHBoxLayout()
+        self.LEEM_window_label = QtWidgets.QLabel("Select Window Type")
+        self.smooth_LEEM_window_type_menu = QtWidgets.QComboBox()
+        self.smooth_LEEM_window_type_menu.addItem("Flat")
+        self.smooth_LEEM_window_type_menu.addItem("Hanning")
+        self.smooth_LEEM_window_type_menu.addItem("Hamming")
+        self.smooth_LEEM_window_type_menu.addItem("Bartlett")
+        self.smooth_LEEM_window_type_menu.addItem("Blackman")
+        window_LEEM_hbox.addWidget(self.LEEM_window_label)
+        window_LEEM_hbox.addWidget(self.smooth_LEEM_window_type_menu)
+        smooth_LEEM_vbox.addLayout(window_LEEM_hbox)
+
+        LEEM_window_len_box = QtWidgets.QHBoxLayout()
+        self.LEEM_window_len_label = QtWidgets.QLabel("Enter Window Length [even integer]")
+        self.LEEM_window_len_entry = QtWidgets.QLineEdit()
+
+        LEEM_window_len_box.addWidget(self.LEEM_window_len_label)
+        LEEM_window_len_box.addWidget(self.LEEM_window_len_entry)
+        smooth_LEEM_vbox.addLayout(LEEM_window_len_box)
+
+        self.apply_settings_LEEM_button = QtWidgets.QPushButton("Apply Smoothing Settings", self)
+        # self.apply_settings_LEEM_button.clicked.connect(lambda: pass)
+        smooth_LEEM_vbox.addWidget(self.apply_settings_LEEM_button)
+
+        smoothColumn.addLayout(smooth_LEEM_vbox)
+        smooth_group.setLayout(smoothColumn)
+
+        configTabVBox.addWidget(smooth_group)
+        configTabVBox.addStretch()
+        configTabVBox.addStretch()
+
+        configtabBottomButtonHBox.addStretch(1)
+        configtabBottomButtonHBox.addWidget(self.quitbut)
+        configTabVBox.addLayout(configtabBottomButtonHBox)
+        self.ConfigTab.setLayout(configTabVBox)
+
     def initLEEDTab(self):
         """Setup Layout of LEED Tab."""
         self.LEEDTabLayout = QtWidgets.QHBoxLayout()
@@ -456,6 +586,18 @@ class Viewer(QtWidgets.QWidget):
 
         sigmcLEEM.connect(self.handleLEEMClick)
         sigmmvLEEM.connect(self.handleLEEMMouseMoved)
+
+    def h_line(self):
+        f = QtWidgets.QFrame()
+        f.setFrameShape(QtWidgets.QFrame.HLine)
+        f.setFrameShadow(QtWidgets.QFrame.Sunken)
+        return f
+
+    def v_line(self):
+        f = QtWidgets.QFrame()
+        f.setFrameShape(QtWidgets.QFrame.VLine)
+        f.setFrameShadow(QtWidgets.QFrame.Sunken)
+        return f
 
     def load_experiment(self):
         """Query User for YAML config file to load experiment settings.
