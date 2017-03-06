@@ -117,177 +117,17 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # LEED menu
         extractAction = QtWidgets.QAction("Extract I(V)", self)
-        extractAction.setShortcut("Ctrl-E")
-        extractAction.triggered.connect(self.viewer.LEEDimagewidget.emitIV)
+        # extractAction.setShortcut("Ctrl-E")
+        extractAction.triggered.connect(self.viewer.processLEEDIV)
         LEEDMenu.addAction(extractAction)
+
+        clearAction = QtWidgets.QAction("Clear I(V)", self)
+        clearAction.triggered.connect(self.viewer.LEEDivplotwidget.clear)
 
     @staticmethod
     def quit():
         """."""
         QtWidgets.QApplication.instance().quit()
-
-
-class ImView(QtWidgets.QGraphicsView):
-    """Container for images using the QGV-Framework."""
-
-    # signal to send to Viewer object to display iv curve
-    # params: int x, int y, int color index
-    ivEvent = QtCore.pyqtSignal(int, int, int)
-
-    # signal to send to Viewer object to clear all IV curves
-    clearEvent = QtCore.pyqtSignal()
-
-    def __init__(self, colors, parent=None, rad=20):
-        """Setup the QGraphicsView Framework; Analogous to Model-View Framework.
-
-        :param: colors - list of QColor objects
-        :param: parent - reference to Viewer object
-        :param: rad - user configurable setting for integration window radius
-
-        :QGraphicsView: self - contains the viewport to see image data
-        :QGraphicsScene: self.scene - container for items to be displayed. Scene
-            also handles event routing between view and graphics items.
-        :QImage: - self.image - Wrapper class around numpy array. Image is
-            cast to uint8 for display purposes. Original image data in numpy
-            array remains unchanged to retain accuracy in all calculations.
-        :QGraphicsPixmapItem: - self.graphicspixmapitem - GraphicsItem wrapper
-            for QPixmap generated from the QImage. Added to Scene to be
-            displayed in viewport.
-        """
-        super(QtWidgets.QGraphicsView, self).__init__(parent=parent)
-        self.num_clicks = 0
-        self.max_clicks = len(colors)
-        self.rects = []  # container to hold QRectF objects
-        self.colors = colors
-        self.boxrad = rad  # User configurable
-        self.hasloadeddata = False
-        # initialize View with random data
-        self.originaldata = np.random.randint(0, 65535, size=(600, 600),
-                                              dtype=np.uint16)
-        # Display data is cast to uint8 to create QImage in 8bit grayscale
-        self.displaydata = self.map16to8(self.originaldata)
-        self.scene = QtWidgets.QGraphicsScene(self)
-        self.image = QtGui.QImage(self.displaydata,
-                                  self.displaydata.shape[1],
-                                  self.displaydata.shape[0],
-                                  self.displaydata.strides[0],
-                                  QtGui.QImage.Format_Grayscale8)
-        self.graphicspixmapitem = QtWidgets.QGraphicsPixmapItem(
-                                         QtGui.QPixmap.fromImage(self.image))
-        self.scene.addItem(self.graphicspixmapitem)
-        self.setScene(self.scene)
-        self.graphicspixmapitem.mousePressEvent = self.handleMouseClick
-
-    @staticmethod
-    def map16to8(img, lower=None, upper=None):
-        """Safely map 16-bit img to 8-bit img for display."""
-        if lower is not None and not (0 <= lower < 65535):
-            raise ValueError("Lower bound must be in [0, 65535].")
-        if upper is not None and not(0 <= upper < 2**16):
-            raise ValueError("Upper bound must be in [0, 65535].")
-        if lower is None:
-            lower = np.amin(img)
-        if upper is None:
-            upper = np.amax(img)
-        if lower >= upper:
-            raise ValueError("Lower bound must be < Upper bound.")
-
-        lut = np.concatenate([
-            np.zeros(lower, dtype=np.uint16),
-            np.linspace(0, 255, upper - lower).astype(np.uint16),
-            np.ones(2**16 - upper, dtype=np.uint16) * 255
-            ])
-        return lut[img].astype(np.uint8)
-
-    def setImage(self, img):
-        """Display numpy array via QGraphicsPixmapItem.
-
-        :param: img - must be a 2D numpy array in 16bit or 8bit format.
-        """
-        if not isinstance(img, np.ndarray):
-            raise ValueError("Image must be a 2d numpy array.")
-        if len(img.shape) > 2:
-            raise ValueError("Image must be a 2d numpy array.")
-        if img.dtype == np.uint16:
-            # Need to convert to an 8bit display version
-            self.originaldata = img
-            self.displaydata = self.map16to8(img)
-        elif img.dtype == np.uint8:
-            self.originaldata = img
-            self.displaydata = img
-        else:
-            raise ValueError("Image must be 16bit or 8bit Grayscale.")
-
-        self.image = QtGui.QImage(self.displaydata,
-                                  self.displaydata.shape[1],
-                                  self.displaydata.shape[0],
-                                  self.displaydata.strides[0],
-                                  QtGui.QImage.Format_Grayscale8)
-        self.graphicspixmapitem = QtWidgets.QGraphicsPixmapItem(
-                                         QtGui.QPixmap.fromImage(self.image))
-        self.scene.addItem(self.graphicspixmapitem)
-        if self.rects:
-            for idx, rect in enumerate(self.rects):
-                # rects are stored as a tuple of (QRectF, QPen)
-                self.scene.addRect(rect[0], pen=rect[1])
-        self.fitInView(self.scene.sceneRect(), QtCore.Qt.KeepAspectRatio)
-        self.hasloadeddata = True
-        self.setScene(self.scene)
-        self.graphicspixmapitem.mousePressEvent = self.handleMouseClick
-
-    def handleMouseClick(self, event):
-        """Draw QRect centered on event.pos().
-
-        Pass postion back to parent to process I(V) curve and display.
-        """
-        if not self.hasloadeddata:
-            return
-
-        xp = event.pos().x()
-        yp = event.pos().y()
-
-        # filter clicks that are too close to edge
-        if xp - self.boxrad < 0 or \
-           xp + self.boxrad > self.displaydata.shape[1] or \
-           yp - self.boxrad < 0 or \
-           yp + self.boxrad > self.displaydata.shape[0]:
-            print("Too close to Edge.")
-            return
-
-        self.num_clicks += 1
-        if self.num_clicks > self.max_clicks:
-            # reset rects
-            self.num_clicks = 1
-            for item in self.scene.items():
-                if not isinstance(item, QtWidgets.QGraphicsPixmapItem):
-                    self.scene.removeItem(item)
-            self.clearEvent.emit()
-            self.rects = []
-
-        topleftcorner = QtCore.QPointF(xp - self.boxrad,
-                                       yp - self.boxrad)
-        rect = QtCore.QRectF(topleftcorner.x(), topleftcorner.y(),
-                             2*self.boxrad, 2*self.boxrad)
-        pen = QtGui.QPen()
-        pen.setStyle(QtCore.Qt.SolidLine)
-        pen.setWidth(4)
-        # pen.setBrush(QtCore.Qt.red)
-        pen.setColor(self.colors[self.num_clicks - 1])
-        self.scene.addRect(rect, pen=pen)
-        self.rects.append((rect, pen))
-
-    def emitIV(self):
-        """Send signal to Viewer to plot I(V) for current selections."""
-        for idx, tup in enumerate(self.rects):
-            rect = tup[0]
-            center = rect.center()
-            xp = center.x()
-            yp = center.y()
-            self.ivEvent.emit(int(xp), int(yp), idx)
-
-    def keyPressEvent(self, event):
-        """Navigate LEED images via arrow keys."""
-        self.parent().keyPressEvent(event)
 
 
 class Viewer(QtWidgets.QWidget):
@@ -312,6 +152,7 @@ class Viewer(QtWidgets.QWidget):
         self.initConfigTab()
         self.tabs.addTab(self.LEEMTab, "LEEM-I(V)")
         self.initLEEMEventHooks()
+        self.initLEEDEventHooks()
         self.tabs.addTab(self.LEEDTab, "LEED-I(V)")
         self.tabs.addTab(self.ConfigTab, "Config")
 
@@ -330,6 +171,11 @@ class Viewer(QtWidgets.QWidget):
         # container for circular patches indicating locations of User clicks in LEEM image
         self.LEEMcircs = []
         self.LEEMclicks = 0
+
+        # container for QRectF patches to be drawn atop LEEDimage
+        self.LEEDrects = []  # stored as tuple (rect, pen)
+        self.LEEDclicks = 0
+        self.boxrad = 20  # Integration windows are rectangles 2*boxrad x 2*boxrad
 
         self.threads = []  # container for QThread objects used for outputting files
 
@@ -354,6 +200,7 @@ class Viewer(QtWidgets.QWidget):
         self.curLEEDIndex = 0
         dummydata = np.zeros((10, 10))
         self.LEEMimage = pg.ImageItem(dummydata)  # required for signal hook
+        self.LEEDimage = pg.ImageItem(dummydata)
         # self.LEEDimage = pg.ImageItem(dummydata)  # required for signal hook
         self.labelStyle = {'color': '#FFFFFF',
                            'font-size': '16pt'}
@@ -371,6 +218,8 @@ class Viewer(QtWidgets.QWidget):
         imtitlehbox.addStretch()
         imvbox.addLayout(imtitlehbox)
         self.LEEMimageplotwidget = pg.PlotWidget()
+        self.LEEMimageplotwidget.hideAxis("bottom")
+        self.LEEMimageplotwidget.hideAxis("left")
         # self.LEEMimageplotwidget.setTitle("LEEM Real Space Image",
         #                                  size='18pt', color='#FFFFFF')
         imvbox.addWidget(self.LEEMimageplotwidget)
@@ -443,7 +292,7 @@ class Viewer(QtWidgets.QWidget):
         # smooth settings
         smoothLEEDVBox = QtWidgets.QVBoxLayout()
         smoothColumn = QtWidgets.QHBoxLayout()
-        smoothGroupBox = QtWidgets.QGroupBox()
+        # smoothGroupBox = QtWidgets.QGroupBox()
 
         # LEED
         self.LEEDSettingsLabel = QtWidgets.QLabel("LEED Data Smoothing Settings")
@@ -544,15 +393,19 @@ class Viewer(QtWidgets.QWidget):
         self.ivvbox = QtWidgets.QVBoxLayout()
 
         imtitlehbox = QtWidgets.QHBoxLayout()
-        self.LEEDTitle = QtWidgets.QLabel("Reciprocal Space LEED Image: {} eV".format(0))
+        self.LEEDTitle = QtWidgets.QLabel("Reciprocal Space LEED Image")
         imtitlehbox.addStretch()
         imtitlehbox.addWidget(self.LEEDTitle)
         imtitlehbox.addStretch()
         self.imvbox.addLayout(imtitlehbox)
 
-        self.LEEDimagewidget = ImView(self.qcolors, parent=self, rad=self.boxrad)
-        self.LEEDimagewidget.ivEvent.connect(self.processLEEDIV)
-        self.LEEDimagewidget.clearEvent.connect(self.clearLEEDIV)
+        # self.LEEDimagewidget = ImView(self.qcolors, parent=self, rad=self.boxrad)
+        # self.LEEDimagewidget.ivEvent.connect(self.processLEEDIV)
+        # self.LEEDimagewidget.clearEvent.connect(self.clearLEEDIV)
+        self.LEEDimagewidget = pg.PlotWidget()
+        self.LEEDimagewidget.hideAxis("bottom")
+        self.LEEDimagewidget.hideAxis("left")
+        self.LEEDimagewidget.addItem(self.LEEDimage)  # dummy data
         self.imvbox.addWidget(self.LEEDimagewidget)
         self.LEEDTabLayout.addLayout(self.imvbox)
 
@@ -587,13 +440,20 @@ class Viewer(QtWidgets.QWidget):
         sigmcLEEM.connect(self.handleLEEMClick)
         sigmmvLEEM.connect(self.handleLEEMMouseMoved)
 
+    def initLEEDEventHooks(self):
+        """Setup event hooks for mouse click in LEEDimagewidget."""
+        sigmcLEED = self.LEEDimage.scene().sigMouseClicked
+        sigmcLEED.connect(self.handleLEEDClick)
+
     def h_line(self):
+        """Convienience to quickly add UI separators."""
         f = QtWidgets.QFrame()
         f.setFrameShape(QtWidgets.QFrame.HLine)
         f.setFrameShadow(QtWidgets.QFrame.Sunken)
         return f
 
     def v_line(self):
+        """Convienience to quickly add UI separators."""
         f = QtWidgets.QFrame()
         f.setFrameShape(QtWidgets.QFrame.VLine)
         f.setFrameShadow(QtWidgets.QFrame.Sunken)
@@ -834,8 +694,8 @@ class Viewer(QtWidgets.QWidget):
             self.threads = []
             for idx, tup in enumerate(self.LEEDselections):
                 outfile = os.path.join(outdir, outname+str(idx)+'.txt')
-                x = tup[1]
-                y = tup[0]
+                x = int(tup[1])
+                y = int(tup[0])
                 int_window = self.leeddat.dat3d[y - self.boxrad:y + self.boxrad + 1,
                                                 x - self.boxrad:x + self.boxrad + 1, :]
                 ilist = [img.sum() for img in np.rollaxis(int_window, 2)]
@@ -916,17 +776,13 @@ class Viewer(QtWidgets.QWidget):
         # if self.hasdisplayedLEEDdata:
         #     self.LEEDimageplotwidget.getPlotItem().clear()
         self.curLEEDIndex = self.leeddat.dat3d.shape[2]//2
-        self.LEEDimagewidget.setImage(self.leeddat.dat3d[:,
+        self.LEEDimage = pg.ImageItem(self.leeddat.dat3d[:,
                                                          :,
-                                                         self.curLEEDIndex])
-        """self.LEEDimage = pg.ImageItem(self.leeddat.dat3d[:,
-                                                         ::-1,
-                                                         self.curLEEDIndex])
+                                                         self.curLEEDIndex].T)
+        self.LEEDimagewidget.addItem(self.LEEDimage)
+        self.LEEDimagewidget.hideAxis('bottom')
+        self.LEEDimagewidget.hideAxis('left')
 
-        self.LEEDimageplotwidget.addItem(self.LEEDimage)
-        self.LEEDimageplotwidget.hideAxis('bottom')
-        self.LEEDimageplotwidget.hideAxis('left')
-        """
         self.leeddat.elist = [self.exp.mine]
         while len(self.leeddat.elist) < self.leeddat.dat3d.shape[2]:
             newEnergy = self.leeddat.elist[-1] + self.exp.stepe
@@ -952,21 +808,13 @@ class Viewer(QtWidgets.QWidget):
             return
 
     def handleLEEMClick(self, event):
-        """User click in image area.
+        """User click registered in LEEMimage area.
 
-        There is a discrepancy between the mouse position as recorded
-        by the event passed from sigMouseMoved versus the mouse position
-        as recorded by sigMouseClicked. The problem appears to be related
-        to having a Title set on the plot area. The mouse click coordinates
-        are offset in the y direction by roughly 20 units. To remedy this
-        one possibility is  to manually offset the y coordinate, but its not
-        clear if the number should always be 20 or it it differs by screen size
-        or resolution.
+        Handles offset for QRectF drawn for circular patch to ensure that
+        the circle is drawn directly below the mouse pointer.
 
-        Thus to address the issue, handleMouseMoved records the current mouse
-        position and saves to a tuple (x, y) stored as currentLEEMPos. Then
-        handleMouseClick extracts the I(V) curve from the stored coordinates
-        rather than from the received mouse cooridnates from the click event.
+        Appends I(V) curve from clicked location to alternate plot window so
+        as to not interfere with the live tracking plot.
         """
         if not self.hasdisplayedLEEMdata:
             return
@@ -1072,27 +920,73 @@ class Viewer(QtWidgets.QWidget):
         self.LEEMivplotwidget.getPlotItem().clear()
         self.LEEMivplotwidget.getPlotItem().addItem(pdi, clear=True)
 
-    @QtCore.pyqtSlot(int, int, int)
-    def processLEEDIV(self, x, y, idx):
-        """Recieve position information from ImView mouseEvent.
+    def handleLEEDClick(self, event):
+        """User click registered in LEEDimage area."""
+        if not self.hasdisplayedLEEDdata:
+            return
 
-        :param: x,y - position of center of mouse click. This defines the center
-            of the rectangluar integration window used to generate the I(V)
-            curve to be displayed on self.LEEDivplotwidget
-        :param: idx - int corresponding to index of color list
-        """
-        self.LEEDselections.append((y, x))
-        int_window = self.leeddat.dat3d[y - self.boxrad:y + self.boxrad + 1,
-                                        x - self.boxrad:x + self.boxrad + 1, :]
-        ilist = [img.sum() for img in np.rollaxis(int_window, 2)]
-        self.LEEDivplotwidget.plot(self.leeddat.elist,
-                                   ilist, pen=pg.mkPen(self.qcolors[idx], width=2))
+        # clicking outside image area may cause event.currentItem
+        # to be None. This would then raise an error when trying to
+        # call event.pos()
+        if event.currentItem is None:
+            return
 
-    @QtCore.pyqtSlot()
+        self.LEEDclicks += 1
+        if self.LEEDclicks > len(self.qcolors):
+            self.LEEDclicks = 1
+            if self.LEEDrects:
+                for rect in self.LEEDrects:
+                    self.LEEDimagewidget.scene().removeItem(rect)
+            self.LEEDrects = []
+
+        pos = event.pos()
+        mappedPos = self.LEEMimage.mapFromScene(pos)
+        xmapfs = int(mappedPos.x())
+        ymapfs = int(mappedPos.y())
+
+        if xmapfs < 0 or \
+           xmapfs > self.leeddat.dat3d.shape[1] or \
+           ymapfs < 0 or \
+           ymapfs > self.leeddat.dat3d.shape[0]:
+            return  # discard click events originating outside the image
+        xp = pos.x()
+        yp = pos.y()
+        topleftcorner = QtCore.QPointF(xp - self.boxrad,
+                                       yp - self.boxrad)
+        rect = QtCore.QRectF(topleftcorner.x(), topleftcorner.y(),
+                             2*self.boxrad, 2*self.boxrad)
+
+        pen = QtGui.QPen()
+        pen.setStyle(QtCore.Qt.SolidLine)
+        pen.setWidth(4)
+        # pen.setBrush(QtCore.Qt.red)
+        pen.setColor(self.qcolors[self.LEEDclicks - 1])
+        self.LEEDimage.scene().addRect(rect, pen=pen)
+        self.LEEDrects.append((rect, pen))
+
+    def processLEEDIV(self):
+        """Plot I(V) from User selections."""
+        if not self.hasdisplayedLEEDdata or not self.LEEDrects:
+            return
+
+        for idx, tup in enumerate(self.LEEDrects):
+            center = tup[0].center()
+            self.LEEDselections.append((center.y(), center.x()))
+            topleft = tup[0].topLeft()
+            xtl = int(topleft.x())
+            ytl = int(topleft.y())
+            int_window = self.leeddat.dat3d[ytl:ytl+2*self.boxrad+1,
+                                            xtl:xtl+2*self.boxrad+1, :]
+            ilist = [img.sum() for img in np.rollaxis(int_window, 2)]
+            self.LEEDivplotwidget.plot(self.leeddat.elist, ilist, pen=pg.mkPen(self.qcolors[idx], width=2))
+
     def clearLEEDIV(self):
         """Receive signal from ImView object indicating need to clear IV curves."""
         self.LEEDivplotwidget.clear()
-        self.LEEDselections = []
+        if self.LEEDrects:
+            for rect in self.LEEDrects:
+                self.LEEDimagewidget.scene().removeItem(rect)
+        # self.LEEDselections = []
 
     def keyPressEvent(self, event):
         """Set Arrow keys for navigation."""
@@ -1129,10 +1023,9 @@ class Viewer(QtWidgets.QWidget):
             if (event.key() == QtCore.Qt.Key_Left) and \
                (self.curLEEDIndex >= minIdx + 1):
                 self.curLEEDIndex -= 1
-                # self.showLEEDImage(self.curLEEDIndex)
-                self.LEEDimagewidget.setImage(self.leeddat.dat3d[:,
-                                                                 :,
-                                                                 self.curLEEDIndex])
+
+                self.showLEEDImage(self.curLEEDIndex)
+
                 title = "Reciprocal Space LEED Image: {} eV"
                 energy = LF.filenumber_to_energy(self.leeddat.elist,
                                                  self.curLEEDIndex)
@@ -1140,10 +1033,9 @@ class Viewer(QtWidgets.QWidget):
             elif (event.key() == QtCore.Qt.Key_Right) and \
                  (self.curLEEDIndex <= maxIdx - 1):
                 self.curLEEDIndex += 1
-                # self.showLEEDImage(self.curLEEDIndex)
-                self.LEEDimagewidget.setImage(self.leeddat.dat3d[:,
-                                                                 :,
-                                                                 self.curLEEDIndex])
+
+                self.showLEEDImage(self.curLEEDIndex)
+
                 title = "Reciprocal Space LEED Image: {} eV"
                 energy = LF.filenumber_to_energy(self.leeddat.elist,
                                                  self.curLEEDIndex)
@@ -1154,6 +1046,12 @@ class Viewer(QtWidgets.QWidget):
         if idx not in range(self.leemdat.dat3d.shape[2] - 1):
             return
         self.LEEMimage.setImage(self.leemdat.dat3d[:, :, idx].T)
+
+    def showLEEDImage(self, idx):
+        """Display LEED image from main data array at index=idx."""
+        if idx not in range(self.leeddat.dat3d.shape[2] - 1):
+            return
+        self.LEEDimage.setImage(self.leeddat.dat3d[:, :, idx].T)
 
 
 def custom_exception_handler(exc_type, exc_value, exc_traceback):
