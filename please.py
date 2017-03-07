@@ -518,7 +518,7 @@ class Viewer(QtWidgets.QWidget):
         """Load LEEM data from settings described by YAML config file."""
         if self.exp is None:
             return
-        self.tabs.setCurrentWidget(self.LEEMTab)
+        self.tabs.setCurrentIndex(0)
         if self.exp.data_type.lower() == 'raw':
             try:
                 # use settings from self.sexp
@@ -564,7 +564,8 @@ class Viewer(QtWidgets.QWidget):
         """Load LEED data from settings described by YAML config file."""
         if self.exp is None:
             return
-        self.tabs.setCurrentWidget(self.LEEDTab)
+        self.tabs.setCurrentIndex(1)
+
         if self.hasdisplayedLEEDdata:
             # self.LEEDimageplotwidget.getPlotItem().clear()
             self.LEEDivplotwidget.getPlotItem().clear()
@@ -1094,7 +1095,7 @@ def main():
         cmd = """osascript cmd.scpt"""
         os.system(cmd)
         os.system(cmd)
-        mw.setFocus()
+        mw.viewer.setFocus()
 
     sys.exit(app.exec_())
 
