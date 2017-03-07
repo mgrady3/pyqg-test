@@ -1078,6 +1078,20 @@ def main():
     # print("Creating Please App ...")
     mw = MainWindow(v=__Version)
     mw.showMaximized()
+
+    # This is a big fix for PyQt5 on macOS
+    # When running a PyQt5 application that is not bundled into a
+    # macOS app bundle; the main menu will not be clickable until you
+    # switch to another application then switch back.
+    # Thus to fix this we execute a quick applescript from the file
+    # cmd.scpt which automates the keystroke "Cmd+Tab" twice to swap
+    # applications then immediately swap back and set Focus to the main window.
+    if "darwin" in sys.platform:
+        cmd = """osascript cmd.scpt"""
+        os.system(cmd)
+        os.system(cmd)
+        mw.setFocus()
+
     sys.exit(app.exec_())
 
 
