@@ -13,6 +13,10 @@ sets and providing an easy popint and click method for extracting I(V) curves.
 Analysis of LEEM-I(V) and LEED-I(V) data sets provides inisght with atomic
 scale resolution to the surface structure of a wide array of materials from
 semiconductors to metals in bulk or thin film as well as single layer 2D materials.
+
+Usage:
+    python please.py
+    This will enter the prgram via the main() method found in this file.
 """
 
 # Stdlib and Scientific Stack imports
