@@ -400,9 +400,6 @@ class Viewer(QtWidgets.QWidget):
         imtitlehbox.addStretch()
         self.imvbox.addLayout(imtitlehbox)
 
-        # self.LEEDimagewidget = ImView(self.qcolors, parent=self, rad=self.boxrad)
-        # self.LEEDimagewidget.ivEvent.connect(self.processLEEDIV)
-        # self.LEEDimagewidget.clearEvent.connect(self.clearLEEDIV)
         self.LEEDimagewidget = pg.PlotWidget()
         self.LEEDimagewidget.hideAxis("bottom")
         self.LEEDimagewidget.hideAxis("left")
@@ -877,7 +874,7 @@ class Viewer(QtWidgets.QWidget):
             self.staticLEEMplot.show()
 
     def handleLEEMMouseMoved(self, pos):
-        """Track mouse movement within LEEM image area."""
+        """Track mouse movement within LEEM image area and display I(V) from mouse location."""
         if not self.hasdisplayedLEEMdata:
             return
         if isinstance(pos, tuple):
