@@ -122,7 +122,8 @@ class MainWindow(QtWidgets.QMainWindow):
         LEEDMenu.addAction(extractAction)
 
         clearAction = QtWidgets.QAction("Clear I(V)", self)
-        clearAction.triggered.connect(self.viewer.LEEDivplotwidget.clear)
+        clearAction.triggered.connect(self.viewer.clearLEEDIV)
+        LEEDMenu.addAction(clearAction)
 
     @staticmethod
     def quit():
@@ -745,7 +746,7 @@ class Viewer(QtWidgets.QWidget):
         self.curLEEMIndex = self.leemdat.dat3d.shape[2]//2
         self.LEEMimage = pg.ImageItem(self.leemdat.dat3d[:,
                                                          :,
-                                                         self.curLEEMIndex].T)
+                                                         self.curLEEMIndex])
         self.LEEMimageplotwidget.addItem(self.LEEMimage)
         self.LEEMimageplotwidget.hideAxis('bottom')
         self.LEEMimageplotwidget.hideAxis('left')
@@ -778,7 +779,7 @@ class Viewer(QtWidgets.QWidget):
         self.curLEEDIndex = self.leeddat.dat3d.shape[2]//2
         self.LEEDimage = pg.ImageItem(self.leeddat.dat3d[:,
                                                          :,
-                                                         self.curLEEDIndex].T)
+                                                         self.curLEEDIndex])
         self.LEEDimagewidget.addItem(self.LEEDimage)
         self.LEEDimagewidget.hideAxis('bottom')
         self.LEEDimagewidget.hideAxis('left')
@@ -981,12 +982,15 @@ class Viewer(QtWidgets.QWidget):
             self.LEEDivplotwidget.plot(self.leeddat.elist, ilist, pen=pg.mkPen(self.qcolors[idx], width=2))
 
     def clearLEEDIV(self):
-        """Receive signal from ImView object indicating need to clear IV curves."""
+        """Triggered by menu action to clear all LEED selections."""
         self.LEEDivplotwidget.clear()
         if self.LEEDrects:
-            for rect in self.LEEDrects:
-                self.LEEDimagewidget.scene().removeItem(rect)
-        # self.LEEDselections = []
+            # items stored as (QRectF, QPen)
+            for tup in self.LEEDrects:
+                self.LEEDimagewidget.scene().removeItem(tup[0])
+            self.LEEDrects = []
+            self.LEEDselections = []
+            self.LEEDclicks = 0
 
     def keyPressEvent(self, event):
         """Set Arrow keys for navigation."""
@@ -1045,13 +1049,13 @@ class Viewer(QtWidgets.QWidget):
         """Display LEEM image from main data array at index=idx."""
         if idx not in range(self.leemdat.dat3d.shape[2] - 1):
             return
-        self.LEEMimage.setImage(self.leemdat.dat3d[:, :, idx].T)
+        self.LEEMimage.setImage(self.leemdat.dat3d[:, :, idx])
 
     def showLEEDImage(self, idx):
         """Display LEED image from main data array at index=idx."""
         if idx not in range(self.leeddat.dat3d.shape[2] - 1):
             return
-        self.LEEDimage.setImage(self.leeddat.dat3d[:, :, idx].T)
+        self.LEEDimage.setImage(self.leeddat.dat3d[:, :, idx])
 
 
 def custom_exception_handler(exc_type, exc_value, exc_traceback):
@@ -1072,7 +1076,7 @@ def main():
     app = QtWidgets.QApplication(sys.argv)
 
     # pyqtgraph settings
-    # pg.setConfigOption('imageAxisOrder', __imgorder)
+    pg.setConfigOption('imageAxisOrder', __imgorder)
 
     # print("Creating Please App ...")
     mw = MainWindow(v=__Version)
