@@ -30,6 +30,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 
 # local project imports
 import LEEMFUNCTIONS as LF
+from configinfo import output_environment_config
 from colors import Palette
 from data import LeedData, LeemData
 from experiment import Experiment
@@ -107,6 +108,7 @@ class MainWindow(QtWidgets.QMainWindow):
         fileMenu = self.menubar.addMenu("File")
         LEEMMenu = self.menubar.addMenu("LEEM")
         LEEDMenu = self.menubar.addMenu("LEED")
+        helpMenu = self.menubar.addMenu("Help")
 
         # File menu
         exitAction = QtWidgets.QAction("Exit", self)
@@ -128,6 +130,11 @@ class MainWindow(QtWidgets.QMainWindow):
         clearAction = QtWidgets.QAction("Clear I(V)", self)
         clearAction.triggered.connect(self.viewer.clearLEEDIV)
         LEEDMenu.addAction(clearAction)
+
+        # Help menu
+        genConfigInfoFileAction = QtWidgets.QAction("Generate User Config File", self)
+        genConfigInfoFileAction.triggered.connect(output_environment_config)
+        helpMenu.addAction(genConfigInfoFileAction)
 
     @staticmethod
     def quit():
