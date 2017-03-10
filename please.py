@@ -198,6 +198,8 @@ class Viewer(QtWidgets.QWidget):
         self.LEEMselections = []  # store coords of leem clicks in (r,c) format
         self.LEEDselections = []  # store coords of leed clicks in (r,c) format
 
+        self.smoothLEEDplot = False
+        self.smoothLEEMplot = False
         self.smoothLEEDoutput = False
         self.smoothLEEMoutput = False
         self.LEEDWindowType = 'flat'
@@ -312,7 +314,7 @@ class Viewer(QtWidgets.QWidget):
 
         self.smoothLEEDCheckBox = QtWidgets.QCheckBox()
         self.smoothLEEDCheckBox.setText("Enable Smoothing")
-        # self.smoothLEEDCheckBox.stateChanged.connect(lambda: pass)
+        self.smoothLEEDCheckBox.stateChanged.connect(lambda: self.smoothing_statechange(data='LEED'))
         smoothLEEDVBox.addWidget(self.smoothLEEDCheckBox)
 
         window_LEED_hbox = QtWidgets.QHBoxLayout()
@@ -336,7 +338,7 @@ class Viewer(QtWidgets.QWidget):
         smoothLEEDVBox.addLayout(LEED_window_len_box)
 
         self.apply_settings_LEED_button = QtWidgets.QPushButton("Apply Smoothing Settings", self)
-        # self.apply_settings_LEED_button.clicked.connect(lambda: pass)
+        self.apply_settings_LEED_button.clicked.connect(lambda: self.validate_smoothing_settings(but='LEED'))
         smoothLEEDVBox.addWidget(self.apply_settings_LEED_button)
 
         smoothColumn.addLayout(smoothLEEDVBox)
@@ -351,10 +353,10 @@ class Viewer(QtWidgets.QWidget):
         self.LEEM_settings_label = QtWidgets.QLabel("LEEM Data Smoothing Settings")
         smooth_LEEM_vbox.addWidget(self.LEEM_settings_label)
 
-        self.smooth_LEEM_checkbox = QtWidgets.QCheckBox()
-        self.smooth_LEEM_checkbox.setText("Enable Smoothing")
-        # self.smooth_LEEM_checkbox.stateChanged.connect(self.smooth_LEEM_state_change)
-        smooth_LEEM_vbox.addWidget(self.smooth_LEEM_checkbox)
+        self.smoothLEEMCheckBox = QtWidgets.QCheckBox()
+        self.smoothLEEMCheckBox.setText("Enable Smoothing")
+        self.smoothLEEMCheckBox.stateChanged.connect(lambda: self.smoothing_statechange(data='LEEM'))
+        smooth_LEEM_vbox.addWidget(self.smoothLEEMCheckBox)
 
         window_LEEM_hbox = QtWidgets.QHBoxLayout()
         self.LEEM_window_label = QtWidgets.QLabel("Select Window Type")
@@ -377,7 +379,7 @@ class Viewer(QtWidgets.QWidget):
         smooth_LEEM_vbox.addLayout(LEEM_window_len_box)
 
         self.apply_settings_LEEM_button = QtWidgets.QPushButton("Apply Smoothing Settings", self)
-        # self.apply_settings_LEEM_button.clicked.connect(lambda: pass)
+        self.apply_settings_LEEM_button.clicked.connect(lambda: self.validate_smoothing_settings(but="LEEM"))
         smooth_LEEM_vbox.addWidget(self.apply_settings_LEEM_button)
 
         smoothColumn.addLayout(smooth_LEEM_vbox)
@@ -721,6 +723,70 @@ class Viewer(QtWidgets.QWidget):
                 self.threads.append(thread)
                 thread.start()
 
+    def validate_smoothing_settings(self, but=None):
+        """Validate User input from Config Tab smoothing settings."""
+        if but is None:
+            return
+        elif but == 'LEED':
+            window_type = str(self.smooth_LEED_window_type_menu.currentText())
+            window_len = str(self.LEED_window_len_entry.text())
+        elif but == 'LEEM':
+            window_type = str(self.smooth_LEEM_window_type_menu.currentText())
+            window_len = str(self.LEEM_window_len_entry.text())
+        else:
+            print("Error: Invalid button label passed to validate_smoothing_settings().")
+            return
+        print("Currently selected smoothing settings: {0} {1}".format(window_type, window_len))
+        try:
+            window_len = int(window_len)
+        except TypeError:
+            print("Error: Window Length setting must be entered as an even integer")
+            return
+        if window_len <= 0:
+            print("Error: Window Length mut be positive even integer")
+            return
+        elif window_len % 2 != 0:
+            print("Error: Window Length was odd. Using closest even integer")
+            window_len += 1
+        if window_type.lower() not in ['flat', 'hanning',
+                                       'hamming', 'bartlett',
+                                       'blackman']:
+            print("Error: Invalid Window Type for data smoothing.")
+            return
+        if but == "LEED":
+            self.LEEDWindowType = window_type.lower()
+            self.LEEDWindowLen = window_len
+        else:
+            self.LEEMWindowType = window_type.lower()
+            self.LEEMWindowLen = window_len
+            # Changing the LEEM smoothing settings means we need to
+            # reset our position mask array which declared if we had
+            # previously calculated the smoothed data for a given point (x, y)
+            self.leemdat.posMask.fill(0)
+        return
+
+    @QtCore.pyqtSlot()
+    def smoothing_statechange(self, data=None):
+        """Toggle LEED smoothing option."""
+        if data is None:
+            return
+        elif data == 'LEED':
+            if self.smoothLEEDCheckBox.isChecked():
+                self.smoothLEEDplot = True
+                self.smoothLEEDoutput = True
+            else:
+                self.smoothLEEDplot = False
+                self.smoothLEEDoutput = False
+            return
+        elif data == 'LEEM':
+            if self.smoothLEEMCheckBox.isChecked():
+                self.smoothLEEMplot = True
+                self.smoothLEEMoutput = True
+            else:
+                self.smoothLEEMplot = False
+                self.smoothLEEMoutput = False
+            return
+
     @staticmethod
     @QtCore.pyqtSlot()
     def output_complete():
@@ -740,6 +806,8 @@ class Viewer(QtWidgets.QWidget):
     @QtCore.pyqtSlot(np.ndarray)
     def retrieve_LEED_data(self, data):
         """Grab the numpy array emitted from the data loading I/O thread."""
+        # data = [np.fliplr(np.rot90(np.rot90(img))) for img in np.rollaxis(data, 2)]
+        # data = np.dstack(data)
         self.leeddat.dat3d = data
         self.leeddat.dat3ds = data.copy()
         self.leeddat.posMask = np.zeros((self.leeddat.dat3d.shape[0],
@@ -916,16 +984,19 @@ class Viewer(QtWidgets.QWidget):
 
         # update IV plot
         xdata = self.leemdat.elist
-
-        if self.leemdat.posMask[ymp, xmp]:
-            ydata = self.leemdat.dat3ds[ymp, xmp, :]
-        else:
-            ydata = LF.smooth(self.leemdat.dat3d[ymp, xmp, :],
-                              window_len=10,
-                              window_type='flat')
+        ydata = self.leemdat.dat3d[ymp, xmp, :]  # raw unsmoothed data
+        if self.smoothLEEMplot and not self.leemdat.posMask[ymp, xmp]:
+            # We want to plot smoothed dat but the I(V) of the current pixel position
+            # has not yet been smoothed
+            ydata = LF.smooth(ydata, window_type=self.LEEMWindowType, window_len=self.LEEMWindowLen)
             self.leemdat.dat3ds[ymp, xmp, :] = ydata
             self.leemdat.posMask[ymp, xmp] = 1
-        pen = pg.mkPen(self.qcolors[0], width=2)
+
+        elif self.smoothLEEMplot and self.leemdat.posMask[ymp, xmp]:
+            # We want to plot smoothed data and have already calculated it for this pixel position
+            ydata = self.leemdat.dat3ds[ymp, xmp, :]
+
+        pen = pg.mkPen(self.qcolors[0], width=3)
         pdi = pg.PlotDataItem(xdata, ydata, pen=pen)
         self.LEEMivplotwidget.getPlotItem().clear()
         self.LEEMivplotwidget.getPlotItem().addItem(pdi, clear=True)
@@ -971,8 +1042,12 @@ class Viewer(QtWidgets.QWidget):
         pen.setWidth(4)
         # pen.setBrush(QtCore.Qt.red)
         pen.setColor(self.qcolors[self.LEEDclicks - 1])
-        self.LEEDimage.scene().addRect(rect, pen=pen)
-        self.LEEDrects.append((rect, pen))
+        rectitem = self.LEEDimage.scene().addRect(rect, pen=pen)
+        # We need access to the QGraphicsRectItem inorder to later call
+        # removeItem(). However, we also need access to the QRectF object
+        # in order to get coordinates. Thus we store a reference to both along
+        # with the pen used for coloring the Rect.
+        self.LEEDrects.append((rectitem, rect, pen))
 
     def processLEEDIV(self):
         """Plot I(V) from User selections."""
@@ -980,14 +1055,16 @@ class Viewer(QtWidgets.QWidget):
             return
 
         for idx, tup in enumerate(self.LEEDrects):
-            center = tup[0].center()
+            center = tup[1].center()
             self.LEEDselections.append((center.y(), center.x()))
-            topleft = tup[0].topLeft()
+            topleft = tup[1].topLeft()
             xtl = int(topleft.x())
             ytl = int(topleft.y())
             int_window = self.leeddat.dat3d[ytl:ytl+2*self.boxrad+1,
                                             xtl:xtl+2*self.boxrad+1, :]
             ilist = [img.sum() for img in np.rollaxis(int_window, 2)]
+            if self.smoothLEEDplot:
+                ilist = LF.smooth(ilist, window_type=self.LEEDWindowType, window_len=self.LEEDWindowLen)
             self.LEEDivplotwidget.plot(self.leeddat.elist, ilist, pen=pg.mkPen(self.qcolors[idx], width=2))
 
     def clearLEEDIV(self):
