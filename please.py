@@ -934,6 +934,8 @@ class Viewer(QtWidgets.QWidget):
                 return
         xdata = self.leemdat.elist
         ydata = self.leemdat.dat3d[ymp, xmp, :]
+        if self.smoothLEEMplot:
+            ydata = LF.smooth(ydata, window_len=self.LEEMWindowLen, window_type=self.LEEMWindowType)
 
         brush = QtGui.QBrush(self.qcolors[self.LEEMclicks - 1])
         rad = 8
