@@ -121,6 +121,10 @@ class MainWindow(QtWidgets.QMainWindow):
         outputLEEMAction.triggered.connect(lambda: self.viewer.outputIV(datatype='LEEM'))
         LEEMMenu.addAction(outputLEEMAction)
 
+        clearLEEMAction = QtWidgets.QAction("Clear I(V)", self)
+        clearLEEMAction.triggered.connect(self.viewer.clearLEEMIV)
+        LEEMMenu.addAction(clearLEEMAction)
+
         # LEED menu
         extractAction = QtWidgets.QAction("Extract I(V)", self)
         # extractAction.setShortcut("Ctrl-E")
@@ -1079,6 +1083,15 @@ class Viewer(QtWidgets.QWidget):
             self.LEEDrects = []
             self.LEEDselections = []
             self.LEEDclicks = 0
+
+    def clearLEEMIV(self):
+        """Clear User selections from LEEM image and clear IV plot."""
+        self.staticLEEMplot.clear()
+        self.LEEMclicks = 0
+        self.LEEMselections = []
+        if self.LEEMcircs:
+            for item in self.LEEMcircs:
+                self.LEEMimageplotwidget.scene().removeItem(item)
 
     def keyPressEvent(self, event):
         """Set Arrow keys for navigation."""
